@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -18,25 +17,17 @@ type Msg struct {
 
 type Bot struct {
 	bot    *gotgbot.Bot
-	chat   int64
-	bucket *bucket.Bucket[Msg]
+	bucket *bucket.Bucket[string, Msg]
 }
 
 type BotOpt struct {
 	APIKey    string
-	ChatID    int64
 	AliveTime time.Duration
 }
 
 func WithAPIKey(apikey string) func(*BotOpt) {
 	return func(opt *BotOpt) {
 		opt.APIKey = apikey
-	}
-}
-
-func WithChatID(chat int64) func(*BotOpt) {
-	return func(opt *BotOpt) {
-		opt.ChatID = chat
 	}
 }
 
@@ -61,33 +52,32 @@ func NewBot(opts ...func(*BotOpt)) *Bot {
 	}
 	return &Bot{
 		bot:    bot,
-		chat:   defaultOpt.ChatID,
-		bucket: bucket.New(defaultOpt.AliveTime, func(a, b Msg) bool { return a.event.Equal(b.event) }),
+		bucket: bucket.New[string, Msg](defaultOpt.AliveTime),
 	}
 }
 
-func (b *Bot) SendMessage(msg string) (*gotgbot.Message, error) {
+func (b *Bot) SendMessage(chat int64, msg string) (*gotgbot.Message, error) {
 	// escape markdown
 	msg = strings.ReplaceAll(msg, "-", "\\-")
-	return b.bot.SendMessage(b.chat, msg, &gotgbot.SendMessageOpts{
+	return b.bot.SendMessage(chat, msg, &gotgbot.SendMessageOpts{
 		ParseMode: "MarkdownV2",
 	})
 }
 
-func (b *Bot) SendEvent(e *Event) error {
-	oldMsg, ok := b.bucket.Get(e.ID)
+func (b *Bot) SendEvent(chat int64, e *Event) error {
+	oldMsg, ok := b.bucket.Get(e.Key)
 	var text string
 	var msg *gotgbot.Message
 	var err error
 
 	if !ok {
 		// New event
-		text = "新事件\n" + e.String()
-		msg, err = b.SendMessage(text)
-	} else if !oldMsg.event.Equal(e) {
+		text += "新事件\n" + e.String()
+		msg, err = b.SendMessage(chat, text)
+	} else if diff := oldMsg.event.Diff(e); diff != "" {
 		// update old event
-		text = "事件更新\n" + oldMsg.event.Diff(e) + "\n" + e.String()
-		msg, err = b.SendMessage(text)
+		text += "事件更新\n" + diff + "\n" + e.String()
+		msg, err = b.SendMessage(chat, text)
 	} else {
 		return nil
 	}
@@ -98,7 +88,7 @@ func (b *Bot) SendEvent(e *Event) error {
 		return err
 	}
 
-	b.bucket.Set(e.ID, Msg{
+	b.bucket.Set(e.Key, Msg{
 		event: e,
 		msg:   msg,
 	})
@@ -107,10 +97,5 @@ func (b *Bot) SendEvent(e *Event) error {
 }
 
 func (b *Bot) GC() {
-	l := b.bucket.Len()
 	b.bucket.GC()
-	if l != b.bucket.Len() {
-		log.Println("GC", l, b.bucket.Len())
-		b.SendMessage(fmt.Sprintf("||--debug--\ngc: %d -> %d||", l, b.bucket.Len()))
-	}
 }

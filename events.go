@@ -6,12 +6,14 @@ import (
 )
 
 type Event struct {
-	ID       string
-	Time     time.Time
-	Type     string
-	Location string
-	Brigade  List
-	Status   string
+	Key         string
+	ID          string
+	Time        time.Time
+	Category    string
+	Subcategory string
+	Location    string
+	Brigade     List
+	Status      string
 }
 
 const timeLayout = "2006/01/02 15:04:05"
@@ -20,40 +22,27 @@ func (e *Event) String() string {
 	s := ""
 
 	if len(e.Brigade) == 0 {
-		s += fmt.Sprintf("`%s\n%s %s %s`", e.Time.Format(timeLayout), e.Type, e.Location, e.Status)
+		s += fmt.Sprintf("`%s\n%s %s %s`", e.Time.Format(timeLayout), e.Category, e.Location, e.Status)
 	} else {
-		s += fmt.Sprintf("`%s\n%s %s %s\n%s`", e.Time.Format(timeLayout), e.Type, e.Location, e.Status, e.Brigade)
+		s += fmt.Sprintf("`%s\n%s %s %s\n%s`", e.Time.Format(timeLayout), e.Category, e.Location, e.Status, e.Brigade)
 	}
 
 	// debug //
-	s += fmt.Sprintf("\n||---debug---\n%s||", e.ID)
+	// s += fmt.Sprintf("\n||---debug---\n%s||", e.ID)
 
 	return s
 }
 
-func (e *Event) Equal(New *Event) bool {
-	if e == nil || New == nil {
-		return false
-	}
-	return e.ID == New.ID &&
-		e.Time.Equal(New.Time) &&
-		e.Type == New.Type &&
-		e.Location == New.Location &&
-		e.Brigade.Equal(New.Brigade) &&
-		e.Status == New.Status
-}
-
 func (e *Event) Diff(other *Event) string {
-	if e.Equal(other) {
-		return ""
-	}
-
 	s := ""
 	if e.Time != other.Time {
 		s += fmt.Sprintf("時間: %s -> %s\n", e.Time.Format(timeLayout), other.Time.Format(timeLayout))
 	}
-	if e.Type != other.Type {
-		s += fmt.Sprintf("類型: %s -> %s\n", e.Type, other.Type)
+	if e.Category != other.Category {
+		s += fmt.Sprintf("類型: %s -> %s\n", e.Category, other.Category)
+	}
+	if e.Subcategory != other.Subcategory {
+		s += fmt.Sprintf("案別: %s -> %s\n", e.Subcategory, other.Subcategory)
 	}
 	if e.Location != other.Location {
 		s += fmt.Sprintf("地點: %s -> %s\n", e.Location, other.Location)
