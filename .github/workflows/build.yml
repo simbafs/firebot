@@ -31,9 +31,9 @@ jobs:
 
             - name: build image
               run: |
-                  docker build . -t ghcr.io/simbafs/tainan-fire:latest -t ghcr.io/simbafs/tainan-fire:${{ steps.vars.outputs.tag }}
+                  docker build . -t ghcr.io/simbafs/firebot:latest -t ghcr.io/simbafs/firebot:${{ steps.vars.outputs.tag }}
 
             - name: push image
               run: |
-                  docker push ghcr.io/simbafs/tainan-fire:${{ steps.vars.outputs.tag }}
-                  docker push ghcr.io/simbafs/tainan-fire:latest
+                  docker push ghcr.io/simbafs/firebot:${{ steps.vars.outputs.tag }}
+                  docker push ghcr.io/simbafs/firebot:latest
