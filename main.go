@@ -15,10 +15,8 @@ var (
 )
 
 func filter(e Event) bool {
-	return true
-	// r := (e.Status != "已到院" && e.Status != "返隊中" && e.Status != "已返隊")
-	// log.Printf("%v: %#v", r, e)
-	// return r
+	r := e.Category == "火災" || len(e.Brigade) >= 2
+	return r
 }
 
 func init() {
@@ -32,6 +30,7 @@ func main() {
 	fetcher := &Fetcher{
 		filter: filter,
 	}
+	first := true
 
 	for {
 		log.Println("Fetching...")
@@ -44,11 +43,12 @@ func main() {
 				}
 
 				for _, event := range events {
-					if err := bot.SendEvent(chat, &event); err != nil {
+					if err := bot.SendEvent(chat, &event, first); err != nil {
 						log.Println(err)
 					}
 				}
 			}()
+			first = false
 		}
 		bot.GC()
 

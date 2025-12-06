@@ -64,7 +64,14 @@ func (b *Bot) SendMessage(chat int64, msg string) (*gotgbot.Message, error) {
 	})
 }
 
-func (b *Bot) SendEvent(chat int64, e *Event) error {
+func (b *Bot) SendEvent(chat int64, e *Event, first bool) error {
+	if first {
+		b.bucket.Set(e.Key, Msg{
+			event: e,
+			msg:   nil,
+		})
+		return nil
+	}
 	oldMsg, ok := b.bucket.Get(e.Key)
 	var text string
 	var msg *gotgbot.Message
