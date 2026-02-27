@@ -13,7 +13,7 @@ type Fetcher struct {
 	filter func(Event) bool
 }
 
-func (f *Fetcher) Fetch(url string) (map[string]Event, error) {
+func (f *Fetcher) Fetch(url, source string) (map[string]Event, error) {
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,8 @@ func (f *Fetcher) Fetch(url string) (map[string]Event, error) {
 			}
 		})
 
-		e.Key = e.Time.Format(time.DateTime)
+		e.Source = source
+		e.GenerateKey()
 
 		if f.filter(e) {
 			results[e.Key] = e

@@ -7,6 +7,7 @@ import (
 
 type Event struct {
 	Key         string
+	Source      string
 	ID          string
 	Time        time.Time
 	Category    string
@@ -17,6 +18,15 @@ type Event struct {
 }
 
 const timeLayout = "2006/01/02 15:04:05"
+
+func (e *Event) GenerateKey() {
+	if e.ID != "" {
+		e.Key = fmt.Sprintf("%s-%s", e.Source, e.ID)
+		return
+	}
+
+	e.Key = fmt.Sprintf("%s-%s-%s-%s-%s", e.Source, e.Time.Format(timeLayout), e.Category, e.Subcategory, e.Location)
+}
 
 func (e *Event) String() string {
 	s := ""

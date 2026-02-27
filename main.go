@@ -7,10 +7,14 @@ import (
 
 var (
 	APIKey = ""
-	chats  = map[int64]string{
-		/* 臺南	*/ -1002309286627: "https://119dts.tncfd.gov.tw/DTS/caselist/html",
-		/* 高雄	*/ -1003110857793: "https://119dts.fdkc.gov.tw/tyfdapp/webControlKC?page=Tfqve7Vz8sjTOllavM2iqQ==&f=IC2SZJqIMDj1EwKMezrgvw==",
-		/* 新竹 */ -1003421899373: "https://119.hcfd.gov.tw/DTS/caselist/html",
+	chats  = []struct {
+		Source string
+		ChatID int64
+		URL    string
+	}{
+		{"臺南", -1002309286627, "https://119dts.tncfd.gov.tw/DTS/caselist/html"},
+		{"高雄", -1003110857793, "https://119dts.fdkc.gov.tw/tyfdapp/webControlKC?page=Tfqve7Vz8sjTOllavM2iqQ==&f=IC2SZJqIMDj1EwKMezrgvw=="},
+		{"新竹", -1003421899373, "https://119.hcfd.gov.tw/DTS/caselist/html"},
 	}
 )
 
@@ -34,22 +38,26 @@ func main() {
 
 	for {
 		log.Println("Fetching...")
-		for chat, url := range chats {
-			go func() {
-				events, err := fetcher.Fetch(url)
+		for _, chat := range chats {
+			go func(c struct {
+				Source string
+				ChatID int64
+				URL    string
+			}, f bool) {
+				events, err := fetcher.Fetch(c.URL, c.Source)
 				if err != nil {
 					log.Println(err)
 					return
 				}
 
 				for _, event := range events {
-					if err := bot.SendEvent(chat, &event, first); err != nil {
+					if err := bot.SendEvent(c.ChatID, &event, f); err != nil {
 						log.Println(err)
 					}
 				}
-			}()
-			first = false
+			}(chat, first)
 		}
+		first = false
 		bot.GC()
 
 		time.Sleep(10 * time.Second)
