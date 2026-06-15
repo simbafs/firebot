@@ -13,7 +13,7 @@ var (
 		URL    string
 	}{
 		{"臺南", -1002309286627, "https://119dts.tncfd.gov.tw/DTS/caselist/html"},
-		{"高雄", -1003110857793, "https://119dts.fdkc.gov.tw/tyfdapp/webControlKC?page=Tfqve7Vz8sjTOllavM2iqQ==&f=IC2SZJqIMDj1EwKMezrgvw=="},
+		{"高雄", -1003110857793, "https://119dts.fdkc.gov.tw/DTS/caselist/html"},
 		{"新竹", -1003421899373, "https://119.hcfd.gov.tw/DTS/caselist/html"},
 	}
 )
