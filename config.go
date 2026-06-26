@@ -30,6 +30,7 @@ var cityDefs = []struct {
 	{"雲林", "YUNLIN", "https://119.ylfire.gov.tw/DTS/caselist/html", "dts"},
 	{"臺中", "TAICHUNG", "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226", "asp"},
 	{"彰化", "CHANGHUA", "https://www.chfd.gov.tw/RealInfo/index.aspx?Parser=99,3,29", "asp"},
+	{"桃園", "TAOYUAN", "https://www.tyfd.gov.tw/cht/index.php?act=caselist", "taoyuan"},
 }
 
 // LoadConfig reads chat configuration from environment variables.

@@ -14,3 +14,4 @@ services:
       # - YUNLIN_CHAT=
       # - TAICHUNG_CHAT=
       # - CHANGHUA_CHAT=
+      # - TAOYUAN_CHAT=

@@ -10,9 +10,7 @@ import (
 	"tainanfire/telegram"
 )
 
-var (
-	APIKey = ""
-)
+var APIKey = ""
 
 func filter(e event.Event) bool {
 	r := e.Category == "火災" || len(e.Brigade) >= 2
@@ -61,9 +59,12 @@ func main() {
 			go func(c ChatConfig, f bool) {
 				var events map[string]event.Event
 				var err error
-				if c.Kind == "asp" {
+				switch c.Kind {
+				case "asp":
 					events, err = fetcher.FetchASP(c.URL, c.Source)
-				} else {
+				case "taoyuan":
+					events, err = fetcher.FetchTaoyuan(c.URL, c.Source)
+				default:
 					events, err = fetcher.Fetch(c.URL, c.Source)
 				}
 				if err != nil {
