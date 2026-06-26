@@ -94,6 +94,31 @@ func (b *TGBot) UnpinAll(chat int64) error {
 	return err
 }
 
+func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) {
+	msgID, ok := b.getMsgID(uid)
+	if !ok {
+		return
+	}
+
+	prevRows, _ := b.getRows(uid)
+	finalRow := render.SnapshotRow("已結案", brigade)
+	rows := append(prevRows, finalRow)
+	h := render.Heading(location, category)
+	markdown := render.RenderRows(h, "已結案", rows)
+
+	if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
+		log.Println("[close-edit-err]", uid, err)
+	}
+
+	if _, err := b.bot.UnpinChatMessage(chat, &gotgbot.UnpinChatMessageOpts{
+		MessageId: &msgID,
+	}); err != nil {
+		log.Println("[unpin-err]", uid, err)
+	}
+	b.delMsgID(uid)
+	b.delRows(uid)
+}
+
 func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error {
 	for i := range result.New {
 		event := &result.New[i]
@@ -119,6 +144,14 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 
 	for i := range result.Updated {
 		ed := &result.Updated[i]
+
+		// "火已滅" means the fire is out — treat as closed immediately.
+		if ed.New.Status == "火已滅" {
+			b.closeEvent(chat, ed.New.UID, ed.New.Location, ed.New.Category, ed.New.Brigade.String())
+			log.Println("[close]", ed.New.UID)
+			continue
+		}
+
 		h := render.Heading(ed.New.Location, ed.New.Category)
 		activity := render.ActivityLine(ed.Changes)
 
@@ -160,28 +193,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
-		msgID, ok := b.getMsgID(event.UID)
-		if !ok {
-			continue
-		}
-
-		prevRows, _ := b.getRows(event.UID)
-		finalRow := render.SnapshotRow("已結案", event.Brigade.String())
-		rows := append(prevRows, finalRow)
-		h := render.Heading(event.Location, event.Category)
-		markdown := render.RenderRows(h, "已結案", rows)
-
-		if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
-			log.Println("[close-edit-err]", event.UID, err)
-		}
-
-		if _, err := b.bot.UnpinChatMessage(chat, &gotgbot.UnpinChatMessageOpts{
-			MessageId: &msgID,
-		}); err != nil {
-			log.Println("[unpin-err]", event.UID, err)
-		}
-		b.delMsgID(event.UID)
-		b.delRows(event.UID)
+		b.closeEvent(chat, event.UID, event.Location, event.Category, event.Brigade.String())
 		log.Println("[close]", event.UID)
 	}
 
