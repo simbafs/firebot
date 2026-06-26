@@ -1,8 +1,6 @@
 module tainanfire
 
-go 1.23.0
-
-toolchain go1.24.4
+go 1.25.0
 
 require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.33
@@ -10,7 +8,6 @@ require (
 )
 
 require (
-	github.com/andybalholm/cascadia v1.3.3 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	github.com/andybalholm/cascadia v1.3.4 // indirect
+	golang.org/x/net v0.56.0 // indirect
 )

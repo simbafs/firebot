@@ -5,5 +5,9 @@ services:
     restart: always
     environment:
       - API_KEY=
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      - TAINAN_CHAT=-1002309286627
+      - TAINAN_URL=https://119dts.tncfd.gov.tw/DTS/caselist/html
+      - KAOHSIUNG_CHAT=-1003110857793
+      - KAOHSIUNG_URL=https://119dts.fdkc.gov.tw/DTS/caselist/html
+      - HSINCHU_CHAT=-1003421899373
+      - HSINCHU_URL=https://119.hcfd.gov.tw/DTS/caselist/html
