@@ -6,7 +6,8 @@ import (
 )
 
 type Event struct {
-	Key         string
+	UID         string // our stable identifier for Telegram message tracking
+	Key         string // internal matching key (same as UID, used by Differ)
 	Source      string
 	ID          string
 	Time        time.Time
@@ -22,10 +23,10 @@ const timeLayout = "2006/01/02 15:04:05"
 func (e *Event) GenerateKey() {
 	if e.ID != "" {
 		e.Key = fmt.Sprintf("%s-%s", e.Source, e.ID)
-		return
+	} else {
+		e.Key = fmt.Sprintf("%s-%s-%s-%s-%s", e.Source, e.Time.Format(timeLayout), e.Category, e.Subcategory, e.Location)
 	}
-
-	e.Key = fmt.Sprintf("%s-%s-%s-%s-%s", e.Source, e.Time.Format(timeLayout), e.Category, e.Subcategory, e.Location)
+	e.UID = e.Key
 }
 
 func (e *Event) String() string {
@@ -64,4 +65,57 @@ func (e *Event) Diff(other *Event) string {
 		s += fmt.Sprintf("狀態: %s -> %s\n", e.Status, other.Status)
 	}
 	return s
+}
+
+type FieldChange struct {
+	Field string
+	Old   string
+	New   string
+}
+
+func (e *Event) Changes(other *Event) []FieldChange {
+	var changes []FieldChange
+	if e.Time != other.Time {
+		changes = append(changes, FieldChange{
+			Field: "時間",
+			Old:   e.Time.Format(timeLayout),
+			New:   other.Time.Format(timeLayout),
+		})
+	}
+	if e.Category != other.Category {
+		changes = append(changes, FieldChange{
+			Field: "類型",
+			Old:   e.Category,
+			New:   other.Category,
+		})
+	}
+	if e.Subcategory != other.Subcategory {
+		changes = append(changes, FieldChange{
+			Field: "案別",
+			Old:   e.Subcategory,
+			New:   other.Subcategory,
+		})
+	}
+	if e.Location != other.Location {
+		changes = append(changes, FieldChange{
+			Field: "地點",
+			Old:   e.Location,
+			New:   other.Location,
+		})
+	}
+	if !e.Brigade.Equal(other.Brigade) {
+		changes = append(changes, FieldChange{
+			Field: "分隊",
+			Old:   e.Brigade.String(),
+			New:   other.Brigade.String(),
+		})
+	}
+	if e.Status != other.Status {
+		changes = append(changes, FieldChange{
+			Field: "狀態",
+			Old:   e.Status,
+			New:   other.Status,
+		})
+	}
+	return changes
 }

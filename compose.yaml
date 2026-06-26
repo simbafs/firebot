@@ -1,0 +1,9 @@
+services:
+  bot:
+    image: ghcr.io/simbafs/tainan-fire:v1.0.0
+    container_name: tainan-fire
+    restart: always
+    environment:
+      - API_KEY=
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro

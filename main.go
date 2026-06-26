@@ -7,15 +7,6 @@ import (
 
 var (
 	APIKey = ""
-	chats  = []struct {
-		Source string
-		ChatID int64
-		URL    string
-	}{
-		{"臺南", -1002309286627, "https://119dts.tncfd.gov.tw/DTS/caselist/html"},
-		{"高雄", -1003110857793, "https://119dts.fdkc.gov.tw/DTS/caselist/html"},
-		{"新竹", -1003421899373, "https://119.hcfd.gov.tw/DTS/caselist/html"},
-	}
 )
 
 func filter(e Event) bool {
@@ -30,35 +21,52 @@ func init() {
 }
 
 func main() {
-	bot := NewBot(WithAPIKey(APIKey))
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	var bot Bot
+	if APIKey != "" {
+		bot = NewTGBot(WithAPIKey(APIKey))
+	} else {
+		log.Println("API_KEY not set, using LocalBot")
+		bot = NewLocalBot()
+	}
+
 	fetcher := &Fetcher{
 		filter: filter,
+	}
+
+	differs := map[string]*Differ{}
+	for _, c := range cfg.Chats {
+		differs[c.Source] = NewDiffer()
 	}
 	first := true
 
 	for {
 		log.Println("Fetching...")
-		for _, chat := range chats {
-			go func(c struct {
-				Source string
-				ChatID int64
-				URL    string
-			}, f bool) {
+		for _, chat := range cfg.Chats {
+			go func(c ChatConfig, f bool) {
 				events, err := fetcher.Fetch(c.URL, c.Source)
 				if err != nil {
 					log.Println(err)
 					return
 				}
 
-				for _, event := range events {
-					if err := bot.SendEvent(c.ChatID, &event, f); err != nil {
-						log.Println(err)
-					}
+				differ := differs[c.Source]
+				if f {
+					differ.Init(events)
+					return
+				}
+
+				result := differ.Diff(events)
+				if err := bot.Broadcast(c.ChatID, result); err != nil {
+					log.Println(err)
 				}
 			}(chat, first)
 		}
 		first = false
-		bot.GC()
 
 		time.Sleep(10 * time.Second)
 	}

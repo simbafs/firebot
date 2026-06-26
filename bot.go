@@ -1,28 +1,26 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
-	"time"
-
-	"tainanfire/bucket"
+	"sync"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
-type Msg struct {
-	event *Event
-	msg   *gotgbot.Message
+type Bot interface {
+	Broadcast(chat int64, result DiffResult) error
 }
 
-type Bot struct {
+type TGBot struct {
 	bot    *gotgbot.Bot
-	bucket *bucket.Bucket[string, Msg]
+	mu     sync.Mutex
+	msgIDs map[string]int64 // UID → Telegram message_id
 }
 
 type BotOpt struct {
-	APIKey    string
-	AliveTime time.Duration
+	APIKey string
 }
 
 func WithAPIKey(apikey string) func(*BotOpt) {
@@ -31,16 +29,8 @@ func WithAPIKey(apikey string) func(*BotOpt) {
 	}
 }
 
-func WithAliveTime(d time.Duration) func(*BotOpt) {
-	return func(opt *BotOpt) {
-		opt.AliveTime = d
-	}
-}
-
-func NewBot(opts ...func(*BotOpt)) *Bot {
-	defaultOpt := &BotOpt{
-		AliveTime: 48 * time.Hour,
-	}
+func NewTGBot(opts ...func(*BotOpt)) *TGBot {
+	defaultOpt := &BotOpt{}
 
 	for _, opt := range opts {
 		opt(defaultOpt)
@@ -50,59 +40,119 @@ func NewBot(opts ...func(*BotOpt)) *Bot {
 	if err != nil {
 		panic(err)
 	}
-	return &Bot{
+	return &TGBot{
 		bot:    bot,
-		bucket: bucket.New[string, Msg](defaultOpt.AliveTime),
+		msgIDs: make(map[string]int64),
 	}
 }
 
-func (b *Bot) SendMessage(chat int64, msg string) (*gotgbot.Message, error) {
-	// escape markdown
-	msg = strings.ReplaceAll(msg, "-", "\\-")
-	return b.bot.SendMessage(chat, msg, &gotgbot.SendMessageOpts{
+func escapeMarkdown(s string) string {
+	return strings.ReplaceAll(s, "-", "\\-")
+}
+
+func (b *TGBot) sendMsg(chat int64, text string) (*gotgbot.Message, error) {
+	return b.bot.SendMessage(chat, escapeMarkdown(text), &gotgbot.SendMessageOpts{
 		ParseMode: "MarkdownV2",
 	})
 }
 
-func (b *Bot) SendEvent(chat int64, e *Event, first bool) error {
-	if first {
-		b.bucket.Set(e.Key, Msg{
-			event: e,
-			msg:   nil,
-		})
-		return nil
-	}
-	oldMsg, ok := b.bucket.Get(e.Key)
-	var text string
-	var msg *gotgbot.Message
-	var err error
-
-	if !ok {
-		// New event
-		text += "新事件\n" + e.String()
-		msg, err = b.SendMessage(chat, text)
-	} else if diff := oldMsg.event.Diff(e); diff != "" {
-		// update old event
-		text += "事件更新\n" + diff + "\n" + e.String()
-		msg, err = b.SendMessage(chat, text)
-	} else {
-		return nil
-	}
-
-	log.Println(text)
-
-	if err != nil {
-		return err
-	}
-
-	b.bucket.Set(e.Key, Msg{
-		event: e,
-		msg:   msg,
+func (b *TGBot) editMsg(chat int64, msgID int64, text string) error {
+	_, _, err := b.bot.EditMessageText(escapeMarkdown(text), &gotgbot.EditMessageTextOpts{
+		ChatId:    chat,
+		MessageId: msgID,
+		ParseMode: "MarkdownV2",
 	})
+	return err
+}
+
+// storeMsgID saves the mapping from event UID to Telegram message_id.
+func (b *TGBot) storeMsgID(uid string, msgID int64) {
+	b.mu.Lock()
+	b.msgIDs[uid] = msgID
+	b.mu.Unlock()
+}
+
+// getMsgID retrieves the Telegram message_id for an event UID.
+func (b *TGBot) getMsgID(uid string) (int64, bool) {
+	b.mu.Lock()
+	id, ok := b.msgIDs[uid]
+	b.mu.Unlock()
+	return id, ok
+}
+
+func (b *TGBot) Broadcast(chat int64, result DiffResult) error {
+	for i := range result.New {
+		event := &result.New[i]
+		text := "新事件\n" + event.String()
+		msg, err := b.sendMsg(chat, text)
+		if err != nil {
+			return err
+		}
+		b.storeMsgID(event.UID, msg.MessageId)
+		log.Println("[new]", event.UID, text)
+	}
+
+	for i := range result.Updated {
+		ed := &result.Updated[i]
+		diff := ed.Old.Diff(&ed.New)
+		text := "事件更新\n" + diff + "\n" + ed.New.String()
+
+		// Try to edit the existing Telegram message for this event.
+		// If editing fails (e.g., message too old or deleted), send a new message.
+		if msgID, ok := b.getMsgID(ed.New.UID); ok {
+			if err := b.editMsg(chat, msgID, text); err == nil {
+				log.Println("[edit]", ed.New.UID)
+				continue
+			}
+		}
+
+		msg, err := b.sendMsg(chat, text)
+		if err != nil {
+			return err
+		}
+		b.storeMsgID(ed.New.UID, msg.MessageId)
+		log.Println("[update]", ed.New.UID, text)
+	}
+
+	for i := range result.Deleted {
+		event := &result.Deleted[i]
+		// Edit the original message to mark the event as resolved.
+		if msgID, ok := b.getMsgID(event.UID); ok {
+			text := "~~事件結束~~\n" + event.String()
+			if err := b.editMsg(chat, msgID, text); err != nil {
+				log.Println("[delete-edit-err]", event.UID, err)
+			} else {
+				log.Println("[delete]", event.UID)
+			}
+		}
+	}
 
 	return nil
 }
 
-func (b *Bot) GC() {
-	b.bucket.GC()
+type LocalBot struct{}
+
+func NewLocalBot() *LocalBot {
+	return &LocalBot{}
+}
+
+func (b *LocalBot) Broadcast(chat int64, result DiffResult) error {
+	for i := range result.New {
+		text := "新事件\n" + result.New[i].String()
+		fmt.Printf("[Chat %d] [new] %s %s\n", chat, result.New[i].UID, text)
+	}
+
+	for i := range result.Updated {
+		ed := &result.Updated[i]
+		diff := ed.Old.Diff(&ed.New)
+		text := "事件更新\n" + diff + "\n" + ed.New.String()
+		fmt.Printf("[Chat %d] [update] %s %s\n", chat, ed.New.UID, text)
+	}
+
+	for i := range result.Deleted {
+		text := "事件結束\n" + result.Deleted[i].String()
+		fmt.Printf("[Chat %d] [delete] %s %s\n", chat, result.Deleted[i].UID, text)
+	}
+
+	return nil
 }

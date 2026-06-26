@@ -1,0 +1,13 @@
+chats:
+  - source: 臺南
+    # chat_id: -1002309286627
+    chat_id: 901756183
+    url: https://119dts.tncfd.gov.tw/DTS/caselist/html
+  - source: 高雄
+    # chat_id: -1003110857793
+    chat_id: 901756183
+    url: https://119dts.fdkc.gov.tw/DTS/caselist/html
+  - source: 新竹
+    # chat_id: -1003421899373
+    chat_id: 901756183
+    url: https://119.hcfd.gov.tw/DTS/caselist/html
