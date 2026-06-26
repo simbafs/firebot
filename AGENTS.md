@@ -1,115 +1,72 @@
 # AGENTS.md
 
-## Project Overview
+## Project
 
-`tainanfire` is a Telegram bot that monitors and broadcasts fire department incidents from Tainan, Kaohsiung, and Hsinchu. It scrapes data from official websites and sends updates to configured Telegram chats.
+`tainanfire` monitors Tainan/Kaohsiung/Hsinchu fire department incident pages, diffs events between fetches, and broadcasts changes to Telegram chats as Rich Messages (Bot API 10.1) with pinned, editable tables.
 
-### Key Features
--   **Multi-Region Support**: Monitors Tainan, Kaohsiung, and Hsinchu fire departments.
--   **Real-time Updates**: Periodically fetches and filters incidents.
--   **Telegram Integration**: Broadcasts filtered events (e.g., fire incidents or major mobilizations) to specific chat groups.
--   **Dockerized**: Run easily with Docker Compose.
+## Run
 
-## Getting Started
+```bash
+export API_KEY="your_telegram_bot_token"
+go run .
+```
 
-### Prerequisites
--   **Go**: Version 1.25 or later.
--   **Docker**: Latest version with Compose V2 support.
--   **Environment Variables**:
-    -   `API_KEY`: Telegram Bot API Key.
+Without `API_KEY`, a `LocalBot` prints to stdout instead of sending to Telegram.
 
-### Installation
-1.  Clone the repository.
-2.  Install dependencies:
-    ```bash
-    go mod download
-    ```
+Configuration lives in `config.yaml` (override path with `CONFIG_PATH` env var):
+```yaml
+chats:
+  - source: 臺南
+    chat_id: -1002309286627
+    url: https://119dts.tncfd.gov.tw/DTS/caselist/html
+```
 
-### Running the Project
--   **Local Development**:
-    ```bash
-    export API_KEY="your_telegram_bot_token"
-    go run .
-    ```
--   **With Docker**:
-    ```bash
-    docker compose up --build
-    ```
+## Architecture
 
-## Debugging
+```
+config.yaml → Config → main loop (every 10s):
+  per city: Fetcher.Fetch(url) → map[string]Event (goquery HTML scrape)
+           → Differ.Diff(events) → DiffResult{New, Updated, Deleted}
+           → Bot.Broadcast(chat, result, silent) → Telegram
+```
 
--   **Logs**: The application uses standard logging. Check stdout/stderr.
--   **Delve**:
-    ```bash
-    dlv debug .
-    ```
+**First fetch** calls `Differ.Init()` to seed the baseline without broadcasting. Subsequent fetches call `Differ.Diff()` and broadcast normally.
 
-## Build, Lint, and Test
+**Event identity** (`events.go:GenerateKey`):
+- Tainan: `Key = "臺南-{編號}"` (has dedicated incident ID column)
+- Kaohsiung: `Key = "{Source}-{Time}-{Category}-{Subcategory}-{Location}"` (no ID)
+- Hsinchu: `Key = "{Source}-{Time}-{Category}-{Location}"` (no ID, no subcategory)
 
-### Build
+**Filter** (`main.go:filter`): only events with `Category == "火災"` OR `len(Brigade) >= 2` are kept.
+
+## Rich Messages (Bot API 10.1)
+
+`richmsg.go` makes raw HTTP POSTs to `sendRichMessage` and `editMessageText?rich_message=` because `gotgbot` v2.0.0-rc.33 does **not** support Bot API 10.1. Do not use gotgbot's `SendMessage` or `EditMessageText` for rich content — they lack the `rich_message` parameter.
+
+When gotgbot adds 10.1 support, `richmsg.go` can be replaced with native calls.
+
+## Message lifecycle
+
+| State | Action |
+|-------|--------|
+| New | `sendRichMessage` + `PinChatMessage` (silent pin) |
+| Updated | `editRichMessage` in-place (accumulates table rows); fallback to new message if edit fails |
+| Closed | `editRichMessage` (final "已結案" row) → `UnpinChatMessage` |
+
+Each event gets **one message**, edited in-place. Table rows accumulate — the first row uses the event receipt time, subsequent rows use `time.Now()` at change detection time. Active events are pinned (newest pin first). Startup calls `UnpinAllChatMessages` to clear leftover pins.
+
+## Build / test
+
 ```bash
 go build -o fire .
+go test ./...       # one test in events_test.go
+go vet ./...
 ```
 
-### Lint
-Use `golangci-lint` for linting.
-```bash
-golangci-lint run
-```
+## Gotchas
 
-### Test
-Run all tests:
-```bash
-go test ./...
-```
-Run a specific test:
-```bash
-go test -v -run TestName ./path/to/package
-```
-
-## Code Style & Guidelines
-
-### General Rules (GOD RULES)
-1.  **Tone**: Say "meow" before answering or performing actions.
-2.  **Git**:
-    -   Never commit without clear instructions.
-    -   Always sign commits (`-S`).
-    -   Retry if signing fails.
-3.  **Tools**:
-    -   Use **Context7 MCP** for documentation/code generation/setup instructions.
-    -   Use **pnpm** instead of npm (if Node.js is involved).
-
-### Go Guidelines
-1.  **Version**: Use Go 1.25.
-2.  **Project Structure**:
-    -   **Do not** use `pkg/`, `internal/`, or `cmd/`.
-    -   Place main package files in the project root.
-    -   Place sub-package directories in the project root (e.g., `bucket/`).
-    -   Use monolithic architecture unless instructed otherwise.
-3.  **Dependencies**:
-    -   **Dependency Injection**: Use `github.com/samber/do/v2` if necessary.
-    -   **Error Handling**: Use `github.com/samber/oops` for errors.
-    -   **HTTP Framework**: Use `gin` (if implementing HTTP server).
-    -   **Database**: Use `sqlc` + `sqlite` (if database is needed).
-4.  **Syntax**:
-    -   Use `for i := range n` (or `for range n`) instead of `for i := 0; i < n; i++`.
-
-### Docker Guidelines
-1.  **Compose File**:
-    -   Name it `compose.yaml`. **Do not** use `docker-compose.yml` or `docker-compose.yaml`.
-    -   Use `docker compose` command, not `docker-compose`.
-    -   Do not include `version: '3.x'` in `compose.yaml`.
-
-### Node.js Guidelines (If applicable)
-1.  **Version**: Use Node.js v25.
-2.  **Formatting**: Use Prettier with the specific configuration in `.prettierrc`.
-3.  **Tailwind CSS**:
-    -   Use v4.
-    -   Import via `@import 'tailwindcss';` in CSS.
-    -   Do not use `postcss` or `autoprefix`.
-    -   Do not use `tailwind.config.js`.
-
-## AI Agent Instructions
--   **Analysis**: Before making changes, analyze `go.mod`, `main.go`, and existing structures.
--   **Conventions**: Adhere to the guidelines above. If existing code violates them (e.g., `docker-compose.yml` exists instead of `compose.yaml`), prioritize migrating to the new standard unless explicitly told otherwise.
--   **Refactoring**: When touching legacy code, opportunistically refactor to match the "Go Guidelines" (e.g., switching `log` to `oops`).
+- **HTML column mapping in `fetch.go` is fragile**: it matches `<th>` text to field names. The three sites have different column sets (see table above). Changing the scraper must handle all three schemas.
+- **gotgbot is pinned to rc.33** — do not upgrade casually; the rich message workaround depends on the gap between gotgbot's API level and Bot API 10.1.
+- **`bucket/` package is unused** — kept for potential future use. Safe to ignore or remove.
+- **No persistent state** — all data (differ prev map, msgIDs, eventRows) is in-memory. Restart clears everything.
+- **Concurrency**: one Differ per city (each protected by its own mutex), goroutines per fetch iteration may overlap. TGBot maps are mutex-protected.
