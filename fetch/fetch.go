@@ -21,6 +21,8 @@ func (f *Fetcher) Fetch(url, source, kind string) (map[string]event.Event, error
 		return f.FetchNTPCJSON(url, source)
 	case "chiayi":
 		return f.FetchChiayi(url, source)
+	case "pingtung":
+		return f.FetchPingtung(url, source)
 	default:
 		return f.FetchDTS(url, source)
 	}

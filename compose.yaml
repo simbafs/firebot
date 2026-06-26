@@ -17,3 +17,4 @@ services:
       # - TAOYUAN_CHAT=
       # - NEWTAIPEI_CHAT=
       # - CHIAYI_CHAT=
+      # - PINGTUNG_CHAT=
