@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -16,7 +15,7 @@ type Bot interface {
 type TGBot struct {
 	bot    *gotgbot.Bot
 	mu     sync.Mutex
-	msgIDs map[string]int64 // UID → latest Telegram message_id (reply chains from the latest)
+	msgIDs map[string]int64 // UID → pinned Telegram message_id
 }
 
 type BotOpt struct {
@@ -46,26 +45,6 @@ func NewTGBot(opts ...func(*BotOpt)) *TGBot {
 	}
 }
 
-func escapeMarkdown(s string) string {
-	return strings.ReplaceAll(s, "-", "\\-")
-}
-
-func (b *TGBot) sendMsg(chat int64, text string) (*gotgbot.Message, error) {
-	return b.bot.SendMessage(chat, escapeMarkdown(text), &gotgbot.SendMessageOpts{
-		ParseMode: "MarkdownV2",
-	})
-}
-
-// sendReply sends a message that replies to the message with replyToMsgID.
-func (b *TGBot) sendReply(chat int64, text string, replyToMsgID int64) (*gotgbot.Message, error) {
-	return b.bot.SendMessage(chat, escapeMarkdown(text), &gotgbot.SendMessageOpts{
-		ParseMode: "MarkdownV2",
-		ReplyParameters: &gotgbot.ReplyParameters{
-			MessageId: replyToMsgID,
-		},
-	})
-}
-
 func (b *TGBot) storeMsgID(uid string, msgID int64) {
 	b.mu.Lock()
 	b.msgIDs[uid] = msgID
@@ -79,51 +58,83 @@ func (b *TGBot) getMsgID(uid string) (int64, bool) {
 	return id, ok
 }
 
+func (b *TGBot) delMsgID(uid string) {
+	b.mu.Lock()
+	delete(b.msgIDs, uid)
+	b.mu.Unlock()
+}
+
 func (b *TGBot) Broadcast(chat int64, result DiffResult) error {
 	for i := range result.New {
 		event := &result.New[i]
-		text := "新事件\n" + event.String()
-		msg, err := b.sendMsg(chat, text)
+		markdown := event.RichMarkdown()
+
+		msg, err := sendRichMessage(b.bot.Token, chat, markdown)
 		if err != nil {
 			return err
 		}
+
+		if _, err := b.bot.PinChatMessage(chat, msg.MessageId, &gotgbot.PinChatMessageOpts{
+			DisableNotification: true,
+		}); err != nil {
+			log.Println("[pin-err]", event.UID, err)
+		}
+
 		b.storeMsgID(event.UID, msg.MessageId)
-		log.Println("[new]", event.UID, text)
+		log.Println("[new]", event.UID)
 	}
 
 	for i := range result.Updated {
 		ed := &result.Updated[i]
-		diff := ed.Old.Diff(&ed.New)
-		text := "事件更新\n" + diff + "\n" + ed.New.String()
+		markdown := ed.RichDiffMarkdown()
 
-		// Reply to the latest message for this event to build a reply chain.
-		// If unavailable, send as a standalone message.
-		if msgID, ok := b.getMsgID(ed.New.UID); ok {
-			reply, err := b.sendReply(chat, text, msgID)
-			if err != nil {
-				log.Println("[update-reply-err]", ed.New.UID, err)
-				// Fallback: send as standalone message
-				msg, err2 := b.sendMsg(chat, text)
+		msgID, ok := b.getMsgID(ed.New.UID)
+		if ok {
+			if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
+				log.Println("[edit-err]", ed.New.UID, err)
+				// Fallback: send as new message + pin
+				msg, err2 := sendRichMessage(b.bot.Token, chat, markdown)
 				if err2 != nil {
 					return err2
 				}
+				if _, err := b.bot.PinChatMessage(chat, msg.MessageId, &gotgbot.PinChatMessageOpts{
+					DisableNotification: true,
+				}); err != nil {
+					log.Println("[pin-err]", ed.New.UID, err)
+				}
 				b.storeMsgID(ed.New.UID, msg.MessageId)
-			} else {
-				// Update latest msgID so the next update replies to this one.
-				b.storeMsgID(ed.New.UID, reply.MessageId)
 			}
 		} else {
-			msg, err := b.sendMsg(chat, text)
+			// Previously untracked — treat as new
+			msg, err := sendRichMessage(b.bot.Token, chat, markdown)
 			if err != nil {
 				return err
 			}
+			if _, err := b.bot.PinChatMessage(chat, msg.MessageId, &gotgbot.PinChatMessageOpts{
+				DisableNotification: true,
+			}); err != nil {
+				log.Println("[pin-err]", ed.New.UID, err)
+			}
 			b.storeMsgID(ed.New.UID, msg.MessageId)
 		}
-		log.Println("[update]", ed.New.UID, text)
+		log.Println("[update]", ed.New.UID)
 	}
 
-	// Deleted events are intentionally not broadcast — they simply disappear
-	// from the website when resolved, which is the expected terminal state.
+	for i := range result.Deleted {
+		event := &result.Deleted[i]
+		msgID, ok := b.getMsgID(event.UID)
+		if !ok {
+			continue
+		}
+
+		if _, err := b.bot.UnpinChatMessage(chat, &gotgbot.UnpinChatMessageOpts{
+			MessageId: &msgID,
+		}); err != nil {
+			log.Println("[unpin-err]", event.UID, err)
+		}
+		b.delMsgID(event.UID)
+		log.Println("[delete]", event.UID)
+	}
 
 	return nil
 }
@@ -136,16 +147,13 @@ func NewLocalBot() *LocalBot {
 
 func (b *LocalBot) Broadcast(chat int64, result DiffResult) error {
 	for i := range result.New {
-		text := "新事件\n" + result.New[i].String()
-		fmt.Printf("[Chat %d] [new] %s %s\n", chat, result.New[i].UID, text)
+		fmt.Printf("[Chat %d] [new] %s\n%s\n\n", chat, result.New[i].UID, result.New[i].RichMarkdown())
 	}
-
 	for i := range result.Updated {
-		ed := &result.Updated[i]
-		diff := ed.Old.Diff(&ed.New)
-		text := "事件更新\n" + diff + "\n" + ed.New.String()
-		fmt.Printf("[Chat %d] [update] %s %s\n", chat, ed.New.UID, text)
+		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, result.Updated[i].New.UID, result.Updated[i].RichDiffMarkdown())
 	}
-
+	for i := range result.Deleted {
+		fmt.Printf("[Chat %d] [delete] unpin %s\n", chat, result.Deleted[i].UID)
+	}
 	return nil
 }
