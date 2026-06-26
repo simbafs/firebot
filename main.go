@@ -57,16 +57,7 @@ func main() {
 	for {
 		for _, chat := range cfg.Chats {
 			go func(c ChatConfig, f bool) {
-				var events map[string]event.Event
-				var err error
-				switch c.Kind {
-				case "asp":
-					events, err = fetcher.FetchASP(c.URL, c.Source)
-				case "taoyuan":
-					events, err = fetcher.FetchTaoyuan(c.URL, c.Source)
-				default:
-					events, err = fetcher.Fetch(c.URL, c.Source)
-				}
+				events, err := fetcher.Fetch(c.URL, c.Source, c.Kind)
 				if err != nil {
 					log.Println(err)
 					return
