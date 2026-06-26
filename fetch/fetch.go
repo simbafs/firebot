@@ -17,6 +17,8 @@ func (f *Fetcher) Fetch(url, source, kind string) (map[string]event.Event, error
 		return f.FetchASP(url, source)
 	case "taoyuan":
 		return f.FetchTaoyuan(url, source)
+	case "ntpc_json":
+		return f.FetchNTPCJSON(url, source)
 	default:
 		return f.FetchDTS(url, source)
 	}

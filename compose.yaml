@@ -15,3 +15,4 @@ services:
       # - TAICHUNG_CHAT=
       # - CHANGHUA_CHAT=
       # - TAOYUAN_CHAT=
+      # - NEWTAIPEI_CHAT=
