@@ -1,4 +1,4 @@
-FROM golang:1.23.3-alpine as build
+FROM golang:1.26-alpine AS build
 
 WORKDIR /build
 LABEL org.opencontainers.image.source="https://github.com/simbafs/coscup-attendance"
@@ -10,7 +10,7 @@ RUN go mod download
 COPY . .
 RUN go build -ldflags "-s -w" -o bot
 
-FROM scratch 
+FROM scratch
 
 WORKDIR /app
 
