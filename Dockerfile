@@ -16,6 +16,5 @@ WORKDIR /app
 
 COPY --from=build /build/bot /app/bot
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY config.yaml /app/config.yaml
 
 CMD [ "./bot" ]
