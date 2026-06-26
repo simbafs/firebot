@@ -55,8 +55,8 @@ func main() {
 	}
 	first := true
 
+	log.Println("start fetching events...")
 	for {
-		log.Println("Fetching...")
 		for _, chat := range cfg.Chats {
 			go func(c ChatConfig, f bool) {
 				events, err := fetcher.Fetch(c.URL, c.Source)
