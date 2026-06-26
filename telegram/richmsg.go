@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -46,7 +47,20 @@ func apiPost(token string, method string, body any) (*gotgbot.Message, error) {
 	}
 
 	url := fmt.Sprintf("%s/bot%s/%s", apiURL, token, method)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(b))
+
+	// Retry transient network errors (connection reset, timeout) up to 3 times
+	// with short backoff. Telegram API errors (e.g. 403, message not found) are
+	// returned immediately without retry.
+	var resp *http.Response
+	for attempt := range 3 {
+		resp, err = http.Post(url, "application/json", bytes.NewReader(b))
+		if err == nil {
+			break
+		}
+		if attempt < 2 {
+			time.Sleep(time.Duration(attempt+1) * time.Second)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s request: %w", method, err)
 	}
