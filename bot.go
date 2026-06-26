@@ -16,7 +16,7 @@ type Bot interface {
 type TGBot struct {
 	bot    *gotgbot.Bot
 	mu     sync.Mutex
-	msgIDs map[string]int64 // UID → Telegram message_id
+	msgIDs map[string]int64 // UID → latest Telegram message_id (reply chains from the latest)
 }
 
 type BotOpt struct {
@@ -56,23 +56,22 @@ func (b *TGBot) sendMsg(chat int64, text string) (*gotgbot.Message, error) {
 	})
 }
 
-func (b *TGBot) editMsg(chat int64, msgID int64, text string) error {
-	_, _, err := b.bot.EditMessageText(escapeMarkdown(text), &gotgbot.EditMessageTextOpts{
-		ChatId:    chat,
-		MessageId: msgID,
+// sendReply sends a message that replies to the message with replyToMsgID.
+func (b *TGBot) sendReply(chat int64, text string, replyToMsgID int64) (*gotgbot.Message, error) {
+	return b.bot.SendMessage(chat, escapeMarkdown(text), &gotgbot.SendMessageOpts{
 		ParseMode: "MarkdownV2",
+		ReplyParameters: &gotgbot.ReplyParameters{
+			MessageId: replyToMsgID,
+		},
 	})
-	return err
 }
 
-// storeMsgID saves the mapping from event UID to Telegram message_id.
 func (b *TGBot) storeMsgID(uid string, msgID int64) {
 	b.mu.Lock()
 	b.msgIDs[uid] = msgID
 	b.mu.Unlock()
 }
 
-// getMsgID retrieves the Telegram message_id for an event UID.
 func (b *TGBot) getMsgID(uid string) (int64, bool) {
 	b.mu.Lock()
 	id, ok := b.msgIDs[uid]
@@ -97,35 +96,34 @@ func (b *TGBot) Broadcast(chat int64, result DiffResult) error {
 		diff := ed.Old.Diff(&ed.New)
 		text := "事件更新\n" + diff + "\n" + ed.New.String()
 
-		// Try to edit the existing Telegram message for this event.
-		// If editing fails (e.g., message too old or deleted), send a new message.
+		// Reply to the latest message for this event to build a reply chain.
+		// If unavailable, send as a standalone message.
 		if msgID, ok := b.getMsgID(ed.New.UID); ok {
-			if err := b.editMsg(chat, msgID, text); err == nil {
-				log.Println("[edit]", ed.New.UID)
-				continue
+			reply, err := b.sendReply(chat, text, msgID)
+			if err != nil {
+				log.Println("[update-reply-err]", ed.New.UID, err)
+				// Fallback: send as standalone message
+				msg, err2 := b.sendMsg(chat, text)
+				if err2 != nil {
+					return err2
+				}
+				b.storeMsgID(ed.New.UID, msg.MessageId)
+			} else {
+				// Update latest msgID so the next update replies to this one.
+				b.storeMsgID(ed.New.UID, reply.MessageId)
 			}
+		} else {
+			msg, err := b.sendMsg(chat, text)
+			if err != nil {
+				return err
+			}
+			b.storeMsgID(ed.New.UID, msg.MessageId)
 		}
-
-		msg, err := b.sendMsg(chat, text)
-		if err != nil {
-			return err
-		}
-		b.storeMsgID(ed.New.UID, msg.MessageId)
 		log.Println("[update]", ed.New.UID, text)
 	}
 
-	for i := range result.Deleted {
-		event := &result.Deleted[i]
-		// Edit the original message to mark the event as resolved.
-		if msgID, ok := b.getMsgID(event.UID); ok {
-			text := "~~事件結束~~\n" + event.String()
-			if err := b.editMsg(chat, msgID, text); err != nil {
-				log.Println("[delete-edit-err]", event.UID, err)
-			} else {
-				log.Println("[delete]", event.UID)
-			}
-		}
-	}
+	// Deleted events are intentionally not broadcast — they simply disappear
+	// from the website when resolved, which is the expected terminal state.
 
 	return nil
 }
@@ -147,11 +145,6 @@ func (b *LocalBot) Broadcast(chat int64, result DiffResult) error {
 		diff := ed.Old.Diff(&ed.New)
 		text := "事件更新\n" + diff + "\n" + ed.New.String()
 		fmt.Printf("[Chat %d] [update] %s %s\n", chat, ed.New.UID, text)
-	}
-
-	for i := range result.Deleted {
-		text := "事件結束\n" + result.Deleted[i].String()
-		fmt.Printf("[Chat %d] [delete] %s %s\n", chat, result.Deleted[i].UID, text)
 	}
 
 	return nil
