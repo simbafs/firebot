@@ -1,4 +1,4 @@
-package main
+package event
 
 import (
 	"fmt"
@@ -31,17 +31,13 @@ func (l List) Diff(other List) string {
 
 	addition := []string{}
 	deletion := []string{}
-	// addition
 	for _, v := range other {
-		found := slices.Contains(l, v)
-		if !found {
+		if !slices.Contains(l, v) {
 			addition = append(addition, v)
 		}
 	}
-	// deletion
 	for _, v := range l {
-		found := slices.Contains(other, v)
-		if !found {
+		if !slices.Contains(other, v) {
 			deletion = append(deletion, v)
 		}
 	}

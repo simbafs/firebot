@@ -3,13 +3,18 @@ package main
 import (
 	"log"
 	"time"
+
+	"tainanfire/diff"
+	"tainanfire/event"
+	"tainanfire/fetch"
+	"tainanfire/telegram"
 )
 
 var (
 	APIKey = ""
 )
 
-func filter(e Event) bool {
+func filter(e event.Event) bool {
 	r := e.Category == "火災" || len(e.Brigade) >= 2
 	return r
 }
@@ -26,35 +31,32 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	var bot Bot
+	var bot telegram.Bot
 	if APIKey != "" {
-		bot = NewTGBot(WithAPIKey(APIKey))
+		bot = telegram.NewTGBot(telegram.WithAPIKey(APIKey))
 	} else {
 		log.Println("API_KEY not set, using LocalBot")
-		bot = NewLocalBot()
+		bot = telegram.NewLocalBot()
 	}
 
-	// Clear all pinned messages from previous run.
 	for _, c := range cfg.Chats {
 		if err := bot.UnpinAll(c.ChatID); err != nil {
 			log.Printf("unpin all chat %d: %v", c.ChatID, err)
 		}
 	}
 
-	fetcher := &Fetcher{
-		filter: filter,
+	fetcher := &fetch.Fetcher{
+		Filter: filter,
 	}
 
-	differs := map[string]*Differ{}
+	differs := map[string]*diff.Differ{}
 	for _, c := range cfg.Chats {
-		differs[c.Source] = NewDiffer()
+		differs[c.Source] = diff.New()
 	}
 	first := true
 
-	log.Println("start bot")
-
 	for {
-		// log.Println("Fetching...")
+		log.Println("Fetching...")
 		for _, chat := range cfg.Chats {
 			go func(c ChatConfig, f bool) {
 				events, err := fetcher.Fetch(c.URL, c.Source)

@@ -1,23 +1,26 @@
-package main
+package telegram
 
 import (
 	"fmt"
 	"log"
 	"sync"
 
+	"tainanfire/diff"
+	"tainanfire/render"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
 type Bot interface {
-	Broadcast(chat int64, result DiffResult, silent bool) error
+	Broadcast(chat int64, result diff.DiffResult, silent bool) error
 	UnpinAll(chat int64) error
 }
 
 type TGBot struct {
 	bot       *gotgbot.Bot
 	mu        sync.Mutex
-	msgIDs    map[string]int64      // UID → pinned Telegram message_id
-	eventRows map[string][]eventRow // UID → accumulated table rows
+	msgIDs    map[string]int64
+	eventRows map[string][]render.EventRow
 }
 
 type BotOpt struct {
@@ -44,7 +47,7 @@ func NewTGBot(opts ...func(*BotOpt)) *TGBot {
 	return &TGBot{
 		bot:       bot,
 		msgIDs:    make(map[string]int64),
-		eventRows: make(map[string][]eventRow),
+		eventRows: make(map[string][]render.EventRow),
 	}
 }
 
@@ -67,13 +70,13 @@ func (b *TGBot) delMsgID(uid string) {
 	b.mu.Unlock()
 }
 
-func (b *TGBot) storeRows(uid string, rows []eventRow) {
+func (b *TGBot) storeRows(uid string, rows []render.EventRow) {
 	b.mu.Lock()
 	b.eventRows[uid] = rows
 	b.mu.Unlock()
 }
 
-func (b *TGBot) getRows(uid string) ([]eventRow, bool) {
+func (b *TGBot) getRows(uid string) ([]render.EventRow, bool) {
 	b.mu.Lock()
 	rows, ok := b.eventRows[uid]
 	b.mu.Unlock()
@@ -91,12 +94,12 @@ func (b *TGBot) UnpinAll(chat int64) error {
 	return err
 }
 
-func (b *TGBot) Broadcast(chat int64, result DiffResult, silent bool) error {
+func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error {
 	for i := range result.New {
 		event := &result.New[i]
-		h := heading(event.Location, event.Category)
-		rows := []eventRow{event.initialRow()}
-		markdown := renderRows(h, "🆕 新事件", rows)
+		h := render.Heading(event.Location, event.Category)
+		rows := []render.EventRow{render.InitialRow(event)}
+		markdown := render.RenderRows(h, "🆕 新事件", rows)
 
 		msg, err := sendRichMessage(b.bot.Token, chat, markdown, silent)
 		if err != nil {
@@ -116,19 +119,18 @@ func (b *TGBot) Broadcast(chat int64, result DiffResult, silent bool) error {
 
 	for i := range result.Updated {
 		ed := &result.Updated[i]
-		h := heading(ed.New.Location, ed.New.Category)
-		activity := activityLine(ed.Changes)
+		h := render.Heading(ed.New.Location, ed.New.Category)
+		activity := render.ActivityLine(ed.Changes)
 
 		prevRows, _ := b.getRows(ed.New.UID)
-		newRow := snapshotRow(ed.New.Status, ed.New.Brigade.String())
+		newRow := render.SnapshotRow(ed.New.Status, ed.New.Brigade.String())
 		rows := append(prevRows, newRow)
-		markdown := renderRows(h, activity, rows)
+		markdown := render.RenderRows(h, activity, rows)
 
 		msgID, ok := b.getMsgID(ed.New.UID)
 		if ok {
 			if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
 				log.Println("[edit-err]", ed.New.UID, err)
-				// Fallback: send as new message + pin (always notify on update)
 				msg, err2 := sendRichMessage(b.bot.Token, chat, markdown, false)
 				if err2 != nil {
 					return err2
@@ -141,7 +143,6 @@ func (b *TGBot) Broadcast(chat int64, result DiffResult, silent bool) error {
 				b.storeMsgID(ed.New.UID, msg.MessageId)
 			}
 		} else {
-			// Previously untracked — treat as new
 			msg, err := sendRichMessage(b.bot.Token, chat, markdown, false)
 			if err != nil {
 				return err
@@ -165,10 +166,10 @@ func (b *TGBot) Broadcast(chat int64, result DiffResult, silent bool) error {
 		}
 
 		prevRows, _ := b.getRows(event.UID)
-		finalRow := snapshotRow("已結案", event.Brigade.String())
+		finalRow := render.SnapshotRow("已結案", event.Brigade.String())
 		rows := append(prevRows, finalRow)
-		h := heading(event.Location, event.Category)
-		markdown := renderRows(h, "已結案", rows)
+		h := render.Heading(event.Location, event.Category)
+		markdown := render.RenderRows(h, "已結案", rows)
 
 		if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
 			log.Println("[close-edit-err]", event.UID, err)
@@ -198,25 +199,25 @@ func (b *LocalBot) UnpinAll(chat int64) error {
 	return nil
 }
 
-func (b *LocalBot) Broadcast(chat int64, result DiffResult, silent bool) error {
+func (b *LocalBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error {
 	for i := range result.New {
 		event := &result.New[i]
-		h := heading(event.Location, event.Category)
-		rows := []eventRow{event.initialRow()}
-		fmt.Printf("[Chat %d] [new] %s\n%s\n\n", chat, event.UID, renderRows(h, "🆕 新事件", rows))
+		h := render.Heading(event.Location, event.Category)
+		rows := []render.EventRow{render.InitialRow(event)}
+		fmt.Printf("[Chat %d] [new] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "🆕 新事件", rows))
 	}
 	for i := range result.Updated {
 		ed := &result.Updated[i]
-		h := heading(ed.New.Location, ed.New.Category)
-		activity := activityLine(ed.Changes)
-		row := snapshotRow(ed.New.Status, ed.New.Brigade.String())
-		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, ed.New.UID, renderRows(h, activity, []eventRow{row}))
+		h := render.Heading(ed.New.Location, ed.New.Category)
+		activity := render.ActivityLine(ed.Changes)
+		row := render.SnapshotRow(ed.New.Status, ed.New.Brigade.String())
+		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, ed.New.UID, render.RenderRows(h, activity, []render.EventRow{row}))
 	}
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
-		h := heading(event.Location, event.Category)
-		row := snapshotRow("已結案", event.Brigade.String())
-		fmt.Printf("[Chat %d] [close] %s\n%s\n\n", chat, event.UID, renderRows(h, "已結案", []eventRow{row}))
+		h := render.Heading(event.Location, event.Category)
+		row := render.SnapshotRow("已結案", event.Brigade.String())
+		fmt.Printf("[Chat %d] [close] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "已結案", []render.EventRow{row}))
 	}
 	return nil
 }

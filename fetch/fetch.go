@@ -1,4 +1,4 @@
-package main
+package fetch
 
 import (
 	"errors"
@@ -6,14 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"tainanfire/event"
+
 	"github.com/PuerkitoBio/goquery"
 )
 
 type Fetcher struct {
-	filter func(Event) bool
+	Filter func(event.Event) bool
 }
 
-func (f *Fetcher) Fetch(url, source string) (map[string]Event, error) {
+func (f *Fetcher) Fetch(url, source string) (map[string]event.Event, error) {
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -24,7 +26,6 @@ func (f *Fetcher) Fetch(url, source string) (map[string]Event, error) {
 		return nil, errors.New("failed to fetch data: " + res.Status)
 	}
 
-	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		return nil, err
@@ -33,10 +34,10 @@ func (f *Fetcher) Fetch(url, source string) (map[string]Event, error) {
 	titles := doc.Find("tbody tr:first-child th").Map(func(i int, s *goquery.Selection) string {
 		return strings.Trim(s.Text(), " \n\t")
 	})
-	results := map[string]Event{}
+	results := map[string]event.Event{}
 
 	doc.Find("tbody tr").Not(":first-child").Each(func(i int, s *goquery.Selection) {
-		e := Event{}
+		e := event.Event{}
 		s.Find("td").Each(func(i int, s *goquery.Selection) {
 			content := strings.Trim(s.Text(), " \n\t")
 			switch titles[i] {
@@ -64,7 +65,7 @@ func (f *Fetcher) Fetch(url, source string) (map[string]Event, error) {
 		e.Source = source
 		e.GenerateKey()
 
-		if f.filter(e) {
+		if f.Filter(e) {
 			results[e.Key] = e
 		}
 	})

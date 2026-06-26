@@ -1,4 +1,4 @@
-package main
+package event
 
 import (
 	"testing"
@@ -19,7 +19,7 @@ func TestEvent_GenerateKey(t *testing.T) {
 	})
 
 	t.Run("without ID", func(t *testing.T) {
-		tm, _ := time.Parse(timeLayout, "2024/01/01 12:00:00")
+		tm, _ := time.Parse(TimeLayout, "2024/01/01 12:00:00")
 		e := &Event{
 			Source:      "KH",
 			Time:        tm,
@@ -29,7 +29,6 @@ func TestEvent_GenerateKey(t *testing.T) {
 		}
 		e.GenerateKey()
 
-		// Expected format: Source-Time-Category-Subcategory-Location
 		expected := "KH-2024/01/01 12:00:00-Fire-Big-CityCenter"
 		if e.Key != expected {
 			t.Errorf("expected key %s, got %s", expected, e.Key)

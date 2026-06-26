@@ -1,4 +1,4 @@
-package main
+package event
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 )
 
 type Event struct {
-	UID         string // our stable identifier for Telegram message tracking
-	Key         string // internal matching key (same as UID, used by Differ)
+	UID         string
+	Key         string
 	Source      string
 	ID          string
 	Time        time.Time
@@ -18,13 +18,13 @@ type Event struct {
 	Status      string
 }
 
-const timeLayout = "2006/01/02 15:04:05"
+const TimeLayout = "2006/01/02 15:04:05"
 
 func (e *Event) GenerateKey() {
 	if e.ID != "" {
 		e.Key = fmt.Sprintf("%s-%s", e.Source, e.ID)
 	} else {
-		e.Key = fmt.Sprintf("%s-%s-%s-%s-%s", e.Source, e.Time.Format(timeLayout), e.Category, e.Subcategory, e.Location)
+		e.Key = fmt.Sprintf("%s-%s-%s-%s-%s", e.Source, e.Time.Format(TimeLayout), e.Category, e.Subcategory, e.Location)
 	}
 	e.UID = e.Key
 }
@@ -33,13 +33,10 @@ func (e *Event) String() string {
 	s := ""
 
 	if len(e.Brigade) == 0 {
-		s += fmt.Sprintf("`%s\n%s %s\n%s %s`", e.Time.Format(timeLayout), e.Category, e.Subcategory, e.Location, e.Status)
+		s += fmt.Sprintf("`%s\n%s %s\n%s %s`", e.Time.Format(TimeLayout), e.Category, e.Subcategory, e.Location, e.Status)
 	} else {
-		s += fmt.Sprintf("`%s\n%s %s\n%s %s\n%s`", e.Time.Format(timeLayout), e.Category, e.Subcategory, e.Location, e.Status, e.Brigade)
+		s += fmt.Sprintf("`%s\n%s %s\n%s %s\n%s`", e.Time.Format(TimeLayout), e.Category, e.Subcategory, e.Location, e.Status, e.Brigade)
 	}
-
-	// debug //
-	// s += fmt.Sprintf("\n||---debug---\n%s||", e.ID)
 
 	return s
 }
@@ -47,7 +44,7 @@ func (e *Event) String() string {
 func (e *Event) Diff(other *Event) string {
 	s := ""
 	if e.Time != other.Time {
-		s += fmt.Sprintf("時間: %s -> %s\n", e.Time.Format(timeLayout), other.Time.Format(timeLayout))
+		s += fmt.Sprintf("時間: %s -> %s\n", e.Time.Format(TimeLayout), other.Time.Format(TimeLayout))
 	}
 	if e.Category != other.Category {
 		s += fmt.Sprintf("類型: %s -> %s\n", e.Category, other.Category)
@@ -78,8 +75,8 @@ func (e *Event) Changes(other *Event) []FieldChange {
 	if e.Time != other.Time {
 		changes = append(changes, FieldChange{
 			Field: "時間",
-			Old:   e.Time.Format(timeLayout),
-			New:   other.Time.Format(timeLayout),
+			Old:   e.Time.Format(TimeLayout),
+			New:   other.Time.Format(TimeLayout),
 		})
 	}
 	if e.Category != other.Category {

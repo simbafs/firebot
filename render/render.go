@@ -1,47 +1,44 @@
-package main
+package render
 
 import (
 	"fmt"
 	"slices"
 	"strings"
 	"time"
+
+	"tainanfire/event"
 )
 
-type eventRow struct {
-	Time    string // formatted time, e.g., "08:03:55"
+type EventRow struct {
+	Time    string
 	Status  string
 	Brigade string
 }
 
-// heading builds the heading line for a rich message, e.g. "中西區民族路二段 - 火災"
-func heading(location, category string) string {
+func Heading(location, category string) string {
 	if category != "" {
 		return location + " - " + category
 	}
 	return location
 }
 
-// initialRow creates the first table row from the event's receipt time.
-func (e *Event) initialRow() eventRow {
-	return eventRow{
+func InitialRow(e *event.Event) EventRow {
+	return EventRow{
 		Time:    e.Time.Format("15:04:05"),
 		Status:  e.Status,
 		Brigade: e.Brigade.String(),
 	}
 }
 
-// snapshotRow creates a new table row with the given status and brigade at the current time.
-func snapshotRow(status, brigade string) eventRow {
-	return eventRow{
+func SnapshotRow(status, brigade string) EventRow {
+	return EventRow{
 		Time:    time.Now().Format("15:04"),
 		Status:  status,
 		Brigade: brigade,
 	}
 }
 
-// renderRows builds a Rich Markdown message from the accumulated rows.
-// activity is a change summary like "狀態：已出動 → 已到達" (may be empty).
-func renderRows(heading, activity string, rows []eventRow) string {
+func RenderRows(heading, activity string, rows []EventRow) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "## %s\n\n", escapeRich(heading))
@@ -63,9 +60,7 @@ func renderRows(heading, activity string, rows []eventRow) string {
 	return b.String()
 }
 
-// activityLine generates a concise summary of all field changes,
-// e.g. "狀態：已出動 → 已到達、新增 仁德分隊"
-func activityLine(changes []FieldChange) string {
+func ActivityLine(changes []event.FieldChange) string {
 	var parts []string
 	for _, c := range changes {
 		switch c.Field {
@@ -100,7 +95,6 @@ func activityLine(changes []FieldChange) string {
 	return strings.Join(parts, "、")
 }
 
-// brigadeDiff compares two comma-separated brigade lists and returns added and removed entries.
 func brigadeDiff(old, new string) (added, removed []string) {
 	oldList := splitAndTrim(old)
 	newList := splitAndTrim(new)
@@ -133,7 +127,6 @@ func splitAndTrim(s string) []string {
 	return result
 }
 
-// escapeRich escapes characters that conflict with Rich Markdown pipe-table syntax.
 func escapeRich(s string) string {
 	s = strings.ReplaceAll(s, "|", "\\|")
 	s = strings.ReplaceAll(s, "\n", " ")

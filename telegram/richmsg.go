@@ -1,4 +1,4 @@
-package main
+package telegram
 
 import (
 	"bytes"
@@ -13,7 +13,6 @@ const apiURL = "https://api.telegram.org"
 
 // sendRichMessage sends a rich formatted message using Bot API 10.1 sendRichMessage.
 // gotgbot does not yet support this endpoint, so we call it via raw HTTP.
-// When silent is true, the message is sent without notification (used for initial bulk load).
 func sendRichMessage(token string, chatID int64, markdown string, silent bool) (*gotgbot.Message, error) {
 	body := map[string]any{
 		"chat_id": chatID,
