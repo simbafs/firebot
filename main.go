@@ -34,6 +34,13 @@ func main() {
 		bot = NewLocalBot()
 	}
 
+	// Clear all pinned messages from previous run.
+	for _, c := range cfg.Chats {
+		if err := bot.UnpinAll(c.ChatID); err != nil {
+			log.Printf("unpin all chat %d: %v", c.ChatID, err)
+		}
+	}
+
 	fetcher := &Fetcher{
 		filter: filter,
 	}
@@ -61,7 +68,7 @@ func main() {
 				}
 
 				result := differ.Diff(events)
-				if err := bot.Broadcast(c.ChatID, result); err != nil {
+				if err := bot.Broadcast(c.ChatID, result, false); err != nil {
 					log.Println(err)
 				}
 			}(chat, first)

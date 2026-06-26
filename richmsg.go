@@ -13,13 +13,16 @@ const apiURL = "https://api.telegram.org"
 
 // sendRichMessage sends a rich formatted message using Bot API 10.1 sendRichMessage.
 // gotgbot does not yet support this endpoint, so we call it via raw HTTP.
-func sendRichMessage(token string, chatID int64, markdown string) (*gotgbot.Message, error) {
+// When silent is true, the message is sent without notification (used for initial bulk load).
+func sendRichMessage(token string, chatID int64, markdown string, silent bool) (*gotgbot.Message, error) {
 	body := map[string]any{
 		"chat_id": chatID,
 		"rich_message": map[string]string{
 			"markdown": markdown,
 		},
-		"disable_notification": true,
+	}
+	if silent {
+		body["disable_notification"] = true
 	}
 	return apiPost(token, "sendRichMessage", body)
 }

@@ -30,6 +30,16 @@ func NewDiffer() *Differ {
 	return &Differ{prev: make(map[string]Event)}
 }
 
+// Init seeds the differ with a baseline snapshot without producing a diff.
+func (d *Differ) Init(current map[string]Event) {
+	d.mu.Lock()
+	d.prev = make(map[string]Event, len(current))
+	for k, v := range current {
+		d.prev[k] = v
+	}
+	d.mu.Unlock()
+}
+
 // Diff compares the current fetch result against the previous one.
 // On the first call (prev is empty), everything is treated as new.
 func (d *Differ) Diff(current map[string]Event) DiffResult {
@@ -64,13 +74,4 @@ func (d *Differ) Diff(current map[string]Event) DiffResult {
 	return result
 }
 
-// Init seeds the differ with a baseline snapshot without producing a diff.
-// Use this on the very first fetch to avoid broadcasting everything as new.
-func (d *Differ) Init(current map[string]Event) {
-	d.mu.Lock()
-	d.prev = make(map[string]Event, len(current))
-	for k, v := range current {
-		d.prev[k] = v
-	}
-	d.mu.Unlock()
-}
+

@@ -4,61 +4,67 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
-// RichMarkdown renders a new event as a Rich Markdown table.
-// Location is the heading, followed by activity line and a single-row table.
-func (e *Event) RichMarkdown() string {
-	var b strings.Builder
-
-	heading := e.Location
-	if e.Category != "" {
-		heading += " - " + e.Category
-	}
-	fmt.Fprintf(&b, "## %s\n\n", escapeRich(heading))
-
-	fmt.Fprintf(&b, "🆕 新事件\n\n")
-
-	b.WriteString("| 時間 | 狀態 | 分隊 |\n")
-	b.WriteString("|:-----|:-----|:-----|\n")
-	fmt.Fprintf(&b, "| %s | %s | %s |\n",
-		e.Time.Format("15:04:05"),
-		escapeRich(e.Status),
-		escapeRich(e.Brigade.String()),
-	)
-
-	return b.String()
+type eventRow struct {
+	Time    string // formatted time, e.g., "08:03:55"
+	Status  string
+	Brigade string
 }
 
-// RichDiffMarkdown renders an updated event as a Rich Markdown table with
-// a change summary line between the heading and the table.
-func (ed *EventDiff) RichDiffMarkdown() string {
+// heading builds the heading line for a rich message, e.g. "中西區民族路二段 - 火災"
+func heading(location, category string) string {
+	if category != "" {
+		return location + " - " + category
+	}
+	return location
+}
+
+// initialRow creates the first table row from the event's receipt time.
+func (e *Event) initialRow() eventRow {
+	return eventRow{
+		Time:    e.Time.Format("15:04:05"),
+		Status:  e.Status,
+		Brigade: e.Brigade.String(),
+	}
+}
+
+// snapshotRow creates a new table row with the given status and brigade at the current time.
+func snapshotRow(status, brigade string) eventRow {
+	return eventRow{
+		Time:    time.Now().Format("15:04"),
+		Status:  status,
+		Brigade: brigade,
+	}
+}
+
+// renderRows builds a Rich Markdown message from the accumulated rows.
+// activity is a change summary like "狀態：已出動 → 已到達" (may be empty).
+func renderRows(heading, activity string, rows []eventRow) string {
 	var b strings.Builder
 
-	heading := ed.New.Location
-	if ed.New.Category != "" {
-		heading += " - " + ed.New.Category
-	}
 	fmt.Fprintf(&b, "## %s\n\n", escapeRich(heading))
 
-	line := activityLine(ed.Changes)
-	if line != "" {
-		fmt.Fprintf(&b, "%s\n\n", line)
+	if activity != "" {
+		fmt.Fprintf(&b, "%s\n\n", activity)
 	}
 
 	b.WriteString("| 時間 | 狀態 | 分隊 |\n")
 	b.WriteString("|:-----|:-----|:-----|\n")
-	fmt.Fprintf(&b, "| %s | %s | %s |\n",
-		ed.New.Time.Format("15:04:05"),
-		escapeRich(ed.New.Status),
-		escapeRich(ed.New.Brigade.String()),
-	)
+	for _, r := range rows {
+		fmt.Fprintf(&b, "| %s | %s | %s |\n",
+			r.Time,
+			escapeRich(r.Status),
+			escapeRich(r.Brigade),
+		)
+	}
 
 	return b.String()
 }
 
 // activityLine generates a concise summary of all field changes,
-// e.g. "狀態更新：已出動 → 已到達、新增 仁德分隊"
+// e.g. "狀態：已出動 → 已到達、新增 仁德分隊"
 func activityLine(changes []FieldChange) string {
 	var parts []string
 	for _, c := range changes {
@@ -129,7 +135,6 @@ func splitAndTrim(s string) []string {
 
 // escapeRich escapes characters that conflict with Rich Markdown pipe-table syntax.
 func escapeRich(s string) string {
-	// Pipe and newline break the table structure.
 	s = strings.ReplaceAll(s, "|", "\\|")
 	s = strings.ReplaceAll(s, "\n", " ")
 	return s
