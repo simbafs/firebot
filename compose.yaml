@@ -16,3 +16,4 @@ services:
       # - CHANGHUA_CHAT=
       # - TAOYUAN_CHAT=
       # - NEWTAIPEI_CHAT=
+      # - CHIAYI_CHAT=
