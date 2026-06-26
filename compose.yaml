@@ -12,3 +12,5 @@ services:
       - HSINCHU_CHAT=-1003421899373
       # - MIAOLI_CHAT=
       # - YUNLIN_CHAT=
+      # - TAICHUNG_CHAT=
+      # - CHANGHUA_CHAT=

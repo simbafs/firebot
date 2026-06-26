@@ -10,6 +10,7 @@ type ChatConfig struct {
 	Source string
 	ChatID int64
 	URL    string
+	Kind   string // "dts" or "asp"
 }
 
 type Config struct {
@@ -20,12 +21,15 @@ var cityDefs = []struct {
 	Source string
 	Prefix string
 	URL    string
+	Kind   string
 }{
-	{"臺南", "TAINAN", "https://119dts.tncfd.gov.tw/DTS/caselist/html"},
-	{"高雄", "KAOHSIUNG", "https://119dts.fdkc.gov.tw/DTS/caselist/html"},
-	{"新竹", "HSINCHU", "https://119.hcfd.gov.tw/DTS/caselist/html"},
-	{"苗栗", "MIAOLI", "https://119mlfire.mlfd.gov.tw/DTS/caselist/html"},
-	{"雲林", "YUNLIN", "https://119.ylfire.gov.tw/DTS/caselist/html"},
+	{"臺南", "TAINAN", "https://119dts.tncfd.gov.tw/DTS/caselist/html", "dts"},
+	{"高雄", "KAOHSIUNG", "https://119dts.fdkc.gov.tw/DTS/caselist/html", "dts"},
+	{"新竹", "HSINCHU", "https://119.hcfd.gov.tw/DTS/caselist/html", "dts"},
+	{"苗栗", "MIAOLI", "https://119mlfire.mlfd.gov.tw/DTS/caselist/html", "dts"},
+	{"雲林", "YUNLIN", "https://119.ylfire.gov.tw/DTS/caselist/html", "dts"},
+	{"臺中", "TAICHUNG", "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226", "asp"},
+	{"彰化", "CHANGHUA", "https://www.chfd.gov.tw/RealInfo/index.aspx?Parser=99,3,29", "asp"},
 }
 
 // LoadConfig reads chat configuration from environment variables.
@@ -50,6 +54,7 @@ func LoadConfig() (*Config, error) {
 				Source: d.Source,
 				ChatID: allChatID,
 				URL:    d.URL,
+				Kind:   d.Kind,
 			})
 		}
 		return &Config{Chats: chats}, nil
@@ -70,6 +75,7 @@ func LoadConfig() (*Config, error) {
 			Source: d.Source,
 			ChatID: chatID,
 			URL:    d.URL,
+			Kind:   d.Kind,
 		})
 	}
 
