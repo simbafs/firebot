@@ -24,7 +24,7 @@ func Heading(location, category string) string {
 
 func InitialRow(e *event.Event) EventRow {
 	return EventRow{
-		Time:    e.Time.Format("15:04:05"),
+		Time:    e.Time.Format("2006/01/02 15:04"),
 		Status:  e.Status,
 		Brigade: e.Brigade.String(),
 	}
@@ -32,7 +32,7 @@ func InitialRow(e *event.Event) EventRow {
 
 func SnapshotRow(status, brigade string) EventRow {
 	return EventRow{
-		Time:    time.Now().Format("15:04"),
+		Time:    time.Now().Format("2006/01/02 15:04"),
 		Status:  status,
 		Brigade: brigade,
 	}
