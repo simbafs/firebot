@@ -101,7 +101,11 @@ func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) 
 	}
 
 	prevRows, _ := b.getRows(uid)
-	finalRow := render.SnapshotRow("已結案", brigade)
+	prevBrigade := ""
+	if len(prevRows) > 0 {
+		prevBrigade = prevRows[len(prevRows)-1].CurBrigade
+	}
+	finalRow := render.SnapshotRow("已結案", prevBrigade, brigade)
 	rows := append(prevRows, finalRow)
 	h := render.Heading(location, category)
 	markdown := render.RenderRows(h, "已結案", rows)
@@ -156,7 +160,11 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 		activity := render.ActivityLine(ed.Changes)
 
 		prevRows, _ := b.getRows(ed.New.UID)
-		newRow := render.SnapshotRow(ed.New.Status, ed.New.Brigade.String())
+		prevBrigade := ""
+		if len(prevRows) > 0 {
+			prevBrigade = prevRows[len(prevRows)-1].CurBrigade
+		}
+		newRow := render.SnapshotRow(ed.New.Status, prevBrigade, ed.New.Brigade.String())
 		rows := append(prevRows, newRow)
 		markdown := render.RenderRows(h, activity, rows)
 
@@ -222,13 +230,13 @@ func (b *LocalBot) Broadcast(chat int64, result diff.DiffResult, silent bool) er
 		ed := &result.Updated[i]
 		h := render.Heading(ed.New.Location, ed.New.Category)
 		activity := render.ActivityLine(ed.Changes)
-		row := render.SnapshotRow(ed.New.Status, ed.New.Brigade.String())
+		row := render.SnapshotRow(ed.New.Status, "", ed.New.Brigade.String())
 		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, ed.New.UID, render.RenderRows(h, activity, []render.EventRow{row}))
 	}
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
 		h := render.Heading(event.Location, event.Category)
-		row := render.SnapshotRow("已結案", event.Brigade.String())
+		row := render.SnapshotRow("已結案", "", event.Brigade.String())
 		fmt.Printf("[Chat %d] [close] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "已結案", []render.EventRow{row}))
 	}
 	return nil

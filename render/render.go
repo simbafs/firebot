@@ -11,9 +11,10 @@ import (
 )
 
 type EventRow struct {
-	Time    string
-	Status  string
-	Brigade string
+	Time       string
+	Status     string
+	Brigade    string
+	CurBrigade string
 }
 
 func Heading(location, category string) string {
@@ -28,19 +29,59 @@ func Heading(location, category string) string {
 }
 
 func InitialRow(e *event.Event) EventRow {
+	raw := e.Brigade.String()
+	names := splitAndTrim(raw)
+	bold := make([]string, len(names))
+	for i, n := range names {
+		bold[i] = "**" + n + "**"
+	}
 	return EventRow{
-		Time:    e.Time.Format("2006/01/02 15:04"),
-		Status:  e.Status,
-		Brigade: e.Brigade.String(),
+		Time:       e.Time.Format("2006/01/02 15:04"),
+		Status:     e.Status,
+		Brigade:    strings.Join(bold, ", "),
+		CurBrigade: raw,
 	}
 }
 
-func SnapshotRow(status, brigade string) EventRow {
+func SnapshotRow(status, prevBrigade, curBrigade string) EventRow {
+	formatted, _ := diffBrigadeMarkdown(prevBrigade, curBrigade)
 	return EventRow{
-		Time:    time.Now().Format("2006/01/02 15:04"),
-		Status:  status,
-		Brigade: brigade,
+		Time:       time.Now().Format("2006/01/02 15:04"),
+		Status:     status,
+		Brigade:    formatted,
+		CurBrigade: curBrigade,
 	}
+}
+
+func diffBrigadeMarkdown(prev, cur string) (formatted, live string) {
+	prevList := splitAndTrim(prev)
+	curList := splitAndTrim(cur)
+
+	curSet := make(map[string]bool, len(curList))
+	for _, n := range curList {
+		curSet[n] = true
+	}
+
+	var parts []string
+	for _, p := range prevList {
+		if curSet[p] {
+			parts = append(parts, p)
+		} else {
+			parts = append(parts, "~~"+p+"~~")
+		}
+	}
+
+	prevSet := make(map[string]bool, len(prevList))
+	for _, p := range prevList {
+		prevSet[p] = true
+	}
+	for _, c := range curList {
+		if !prevSet[c] {
+			parts = append(parts, "**"+c+"**")
+		}
+	}
+
+	return strings.Join(parts, ", "), cur
 }
 
 func RenderRows(heading, activity string, rows []EventRow) string {
