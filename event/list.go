@@ -9,7 +9,7 @@ import (
 type List []string
 
 func (l List) String() string {
-	return strings.Join(l, ",")
+	return strings.Join(l, ", ")
 }
 
 func (l List) Equal(other List) bool {
