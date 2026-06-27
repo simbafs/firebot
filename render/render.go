@@ -25,15 +25,10 @@ func Heading(location, category string) string {
 
 func InitialRow(e *event.Event) EventRow {
 	raw := e.Brigade.String()
-	names := splitAndTrim(raw)
-	bold := make([]string, len(names))
-	for i, n := range names {
-		bold[i] = "**" + n + "**"
-	}
 	return EventRow{
 		Time:       e.Time.Format("2006/01/02 15:04"),
 		Status:     e.Status,
-		Brigade:    strings.Join(bold, ", "),
+		Brigade:    raw,
 		CurBrigade: raw,
 	}
 }
