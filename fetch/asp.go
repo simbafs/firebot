@@ -52,8 +52,11 @@ func (f *Fetcher) FetchASP(url, source string) (map[string]event.Event, error) {
 				e.Category = content
 			case "案別":
 				e.Subcategory = content
-			case "發生地點":
-				e.Location = content
+		case "發生地點":
+			e.Location = content
+			if before, _, found := strings.Cut(content, "google 地圖"); found {
+				e.Location = strings.TrimSpace(before)
+			}
 			case "執行狀況":
 				e.Status = content
 			}
