@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"sync"
 
 	"tainanfire/diff"
@@ -94,6 +95,15 @@ func (b *TGBot) UnpinAll(chat int64) error {
 	return err
 }
 
+// googleMapsURL builds a Google Maps search URL for the given location.
+// The URL includes "api=1" which tells Google that this is an API-triggered search.
+func googleMapsURL(location string) string {
+	if location == "" {
+		return ""
+	}
+	return "https://www.google.com/maps/search/?api=1&query=" + url.QueryEscape(location)
+}
+
 func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) {
 	msgID, ok := b.getMsgID(uid)
 	if !ok {
@@ -109,8 +119,9 @@ func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) 
 	rows := append(prevRows, finalRow)
 	h := render.Heading(location, category)
 	markdown := render.RenderRows(h, "已結案", rows)
+	mapsURL := googleMapsURL(location)
 
-	if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
+	if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown, mapsURL); err != nil {
 		log.Println("[close-edit-err]", uid, err)
 	}
 
@@ -129,8 +140,9 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 		h := render.Heading(event.Location, event.Category)
 		rows := []render.EventRow{render.InitialRow(event)}
 		markdown := render.RenderRows(h, "🆕 新事件", rows)
+		mapsURL := googleMapsURL(event.Location)
 
-		msg, err := sendRichMessage(b.bot.Token, chat, markdown, silent)
+		msg, err := sendRichMessage(b.bot.Token, chat, markdown, mapsURL, silent)
 		if err != nil {
 			return err
 		}
@@ -167,12 +179,13 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 		newRow := render.SnapshotRow(ed.New.Status, prevBrigade, ed.New.Brigade.String())
 		rows := append(prevRows, newRow)
 		markdown := render.RenderRows(h, activity, rows)
+		mapsURL := googleMapsURL(ed.New.Location)
 
 		msgID, ok := b.getMsgID(ed.New.UID)
 		if ok {
-			if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown); err != nil {
+			if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown, mapsURL); err != nil {
 				log.Println("[edit-err]", ed.New.UID, err)
-				msg, err2 := sendRichMessage(b.bot.Token, chat, markdown, false)
+				msg, err2 := sendRichMessage(b.bot.Token, chat, markdown, mapsURL, false)
 				if err2 != nil {
 					return err2
 				}
@@ -184,7 +197,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 				b.storeMsgID(ed.New.UID, msg.MessageId)
 			}
 		} else {
-			msg, err := sendRichMessage(b.bot.Token, chat, markdown, false)
+			msg, err := sendRichMessage(b.bot.Token, chat, markdown, mapsURL, false)
 			if err != nil {
 				return err
 			}

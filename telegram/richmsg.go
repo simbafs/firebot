@@ -14,7 +14,10 @@ const apiURL = "https://api.telegram.org"
 
 // sendRichMessage sends a rich formatted message using Bot API 10.1 sendRichMessage.
 // gotgbot does not yet support this endpoint, so we call it via raw HTTP.
-func sendRichMessage(token string, chatID int64, markdown string, silent bool) (*gotgbot.Message, error) {
+// mapsURL, if non-empty, adds an inline keyboard button that opens the given URL
+// (since & in URLs gets HTML-escaped by rich_message's markdown parser, the
+// inline keyboard button's url field bypasses this).
+func sendRichMessage(token string, chatID int64, markdown string, mapsURL string, silent bool) (*gotgbot.Message, error) {
 	body := map[string]any{
 		"chat_id": chatID,
 		"rich_message": map[string]string{
@@ -24,18 +27,33 @@ func sendRichMessage(token string, chatID int64, markdown string, silent bool) (
 	if silent {
 		body["disable_notification"] = true
 	}
+	if mapsURL != "" {
+		body["reply_markup"] = map[string]any{
+			"inline_keyboard": [][]map[string]string{
+				{{"text": "📍 Google 地圖", "url": mapsURL}},
+			},
+		}
+	}
 	return apiPost(token, "sendRichMessage", body)
 }
 
 // editRichMessage edits an existing rich message in-place.
 // Uses editMessageText with the rich_message parameter (Bot API 10.1).
-func editRichMessage(token string, chatID int64, msgID int64, markdown string) (*gotgbot.Message, error) {
+// mapsURL, if non-empty, adds/updates the inline keyboard button.
+func editRichMessage(token string, chatID int64, msgID int64, markdown string, mapsURL string) (*gotgbot.Message, error) {
 	body := map[string]any{
 		"chat_id":    chatID,
 		"message_id": msgID,
 		"rich_message": map[string]string{
 			"markdown": markdown,
 		},
+	}
+	if mapsURL != "" {
+		body["reply_markup"] = map[string]any{
+			"inline_keyboard": [][]map[string]string{
+				{{"text": "📍 Google 地圖", "url": mapsURL}},
+			},
+		}
 	}
 	return apiPost(token, "editMessageText", body)
 }

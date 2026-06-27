@@ -2,7 +2,6 @@ package render
 
 import (
 	"fmt"
-	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -18,14 +17,10 @@ type EventRow struct {
 }
 
 func Heading(location, category string) string {
-	loc := location
-	if location != "" {
-		loc = fmt.Sprintf("[%s](https://www.google.com/maps/search/?api=1&query=%s)", location, url.QueryEscape(location))
-	}
 	if category != "" {
-		return loc + " - " + category
+		return location + " - " + category
 	}
-	return loc
+	return location
 }
 
 func InitialRow(e *event.Event) EventRow {
