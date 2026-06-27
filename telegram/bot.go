@@ -145,12 +145,12 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 	for i := range result.Updated {
 		ed := &result.Updated[i]
 
-		// "火已滅" means the fire is out — treat as closed immediately.
-		if ed.New.Status == "火已滅" {
-			b.closeEvent(chat, ed.New.UID, ed.New.Location, ed.New.Category, ed.New.Brigade.String())
-			log.Println("[close]", ed.New.UID)
-			continue
-		}
+		// // "火已滅" means the fire is out — treat as closed immediately.
+		// if ed.New.Status == "火已滅" {
+		// 	b.closeEvent(chat, ed.New.UID, ed.New.Location, ed.New.Category, ed.New.Brigade.String())
+		// 	log.Println("[close]", ed.New.UID)
+		// 	continue
+		// }
 
 		h := render.Heading(ed.New.Location, ed.New.Category)
 		activity := render.ActivityLine(ed.Changes)
