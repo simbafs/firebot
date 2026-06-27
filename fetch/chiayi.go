@@ -109,5 +109,5 @@ func parseROC(s string) time.Time {
 	min, _ := strconv.Atoi(timeParts[1])
 	sec, _ := strconv.Atoi(timeParts[2])
 
-	return time.Date(year+1911, time.Month(month), day, hour, min, sec, 0, time.Local)
+	return time.Date(year+1911, time.Month(month), day, hour, min, sec, 0, event.TWLoc)
 }

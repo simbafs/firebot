@@ -48,7 +48,7 @@ func (f *Fetcher) FetchTaoyuan(url, source string) (map[string]event.Event, erro
 			case 0:
 				t, err := time.Parse("2006-01-02 15:04", content)
 				if err == nil {
-					e.Time = t
+					e.Time = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, event.TWLoc)
 				}
 			case 1:
 				e.Category = content

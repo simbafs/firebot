@@ -20,6 +20,18 @@ type Event struct {
 
 const TimeLayout = "2006/01/02 15:04:05"
 
+// TWLoc is Asia/Taipei (UTC+8) — all event times come from Taiwan fire departments
+// and snapshot times (time.Now()) should use this timezone regardless of server location.
+var TWLoc *time.Location
+
+func init() {
+	var err error
+	TWLoc, err = time.LoadLocation("Asia/Taipei")
+	if err != nil {
+		TWLoc = time.FixedZone("CST", 8*60*60)
+	}
+}
+
 func (e *Event) GenerateKey() {
 	if e.ID != "" {
 		e.Key = fmt.Sprintf("%s-%s", e.Source, e.ID)

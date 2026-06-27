@@ -41,7 +41,7 @@ func InitialRow(e *event.Event) EventRow {
 func SnapshotRow(status, prevBrigade, curBrigade string) EventRow {
 	formatted, _ := diffBrigadeMarkdown(prevBrigade, curBrigade)
 	return EventRow{
-		Time:       time.Now().Format("2006/01/02 15:04"),
+		Time:       time.Now().In(event.TWLoc).Format("2006/01/02 15:04"),
 		Status:     status,
 		Brigade:    formatted,
 		CurBrigade: curBrigade,

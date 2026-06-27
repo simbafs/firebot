@@ -43,7 +43,7 @@ func (f *Fetcher) FetchASP(url, source string) (map[string]event.Event, error) {
 			case "受理時間":
 				t, err := time.Parse("2006/01/02 15:04:05", content)
 				if err == nil {
-					t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.Local)
+					t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, event.TWLoc)
 				}
 				e.Time = t
 			case "派遣分隊":
