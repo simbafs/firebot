@@ -59,7 +59,7 @@ func main() {
 			go func(c ChatConfig, f bool) {
 				events, err := fetcher.Fetch(c.URL, c.Source, c.Kind)
 				if err != nil {
-					log.Println(err)
+					log.Println(c.Source, err)
 					return
 				}
 
