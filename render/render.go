@@ -128,7 +128,7 @@ func ActivityLine(changes []event.FieldChange) string {
 			}
 		}
 	}
-	return strings.Join(parts, "、")
+	return strings.Join(parts, "\n")
 }
 
 func brigadeDiff(old, new string) (added, removed []string) {
