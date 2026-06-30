@@ -16,11 +16,14 @@ type EventRow struct {
 	CurBrigade string
 }
 
-func Heading(location, category string) string {
-	if category != "" {
-		return location + " - " + category
+func Heading(location, category, subcategory string) string {
+	if category == "" {
+		return location
 	}
-	return location
+	if subcategory != "" {
+		return location + " - " + category + " · " + subcategory
+	}
+	return location + " - " + category
 }
 
 func InitialRow(e *event.Event) EventRow {

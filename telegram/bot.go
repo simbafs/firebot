@@ -104,7 +104,7 @@ func googleMapsURL(location string) string {
 	return "https://www.google.com/maps/search/?api=1&query=" + url.QueryEscape(location)
 }
 
-func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) {
+func (b *TGBot) closeEvent(chat int64, uid, location, category, subcategory, brigade string) {
 	msgID, ok := b.getMsgID(uid)
 	if !ok {
 		return
@@ -117,7 +117,7 @@ func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) 
 	}
 	finalRow := render.SnapshotRow("已結案", prevBrigade, brigade)
 	rows := append(prevRows, finalRow)
-	h := render.Heading(location, category)
+	h := render.Heading(location, category, subcategory)
 	markdown := render.RenderRows(h, "已結案", rows)
 	mapsURL := googleMapsURL(location)
 
@@ -137,7 +137,7 @@ func (b *TGBot) closeEvent(chat int64, uid, location, category, brigade string) 
 func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error {
 	for i := range result.New {
 		event := &result.New[i]
-		h := render.Heading(event.Location, event.Category)
+		h := render.Heading(event.Location, event.Category, event.Subcategory)
 		rows := []render.EventRow{render.InitialRow(event)}
 		markdown := render.RenderRows(h, "🆕 新事件", rows)
 		mapsURL := googleMapsURL(event.Location)
@@ -168,7 +168,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 		// 	continue
 		// }
 
-		h := render.Heading(ed.New.Location, ed.New.Category)
+		h := render.Heading(ed.New.Location, ed.New.Category, ed.New.Subcategory)
 		activity := render.ActivityLine(ed.Changes)
 
 		prevRows, _ := b.getRows(ed.New.UID)
@@ -214,7 +214,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
-		b.closeEvent(chat, event.UID, event.Location, event.Category, event.Brigade.String())
+		b.closeEvent(chat, event.UID, event.Location, event.Category, event.Subcategory, event.Brigade.String())
 		log.Println("[close]", event.UID)
 	}
 
@@ -235,20 +235,20 @@ func (b *LocalBot) UnpinAll(chat int64) error {
 func (b *LocalBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error {
 	for i := range result.New {
 		event := &result.New[i]
-		h := render.Heading(event.Location, event.Category)
+		h := render.Heading(event.Location, event.Category, event.Subcategory)
 		rows := []render.EventRow{render.InitialRow(event)}
 		fmt.Printf("[Chat %d] [new] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "🆕 新事件", rows))
 	}
 	for i := range result.Updated {
 		ed := &result.Updated[i]
-		h := render.Heading(ed.New.Location, ed.New.Category)
+		h := render.Heading(ed.New.Location, ed.New.Category, ed.New.Subcategory)
 		activity := render.ActivityLine(ed.Changes)
 		row := render.SnapshotRow(ed.New.Status, "", ed.New.Brigade.String())
 		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, ed.New.UID, render.RenderRows(h, activity, []render.EventRow{row}))
 	}
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
-		h := render.Heading(event.Location, event.Category)
+		h := render.Heading(event.Location, event.Category, event.Subcategory)
 		row := render.SnapshotRow("已結案", "", event.Brigade.String())
 		fmt.Printf("[Chat %d] [close] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "已結案", []render.EventRow{row}))
 	}
