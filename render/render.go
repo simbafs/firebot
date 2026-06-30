@@ -29,7 +29,7 @@ func Heading(location, category, subcategory string) string {
 func InitialRow(e *event.Event) EventRow {
 	raw := e.Brigade.String()
 	return EventRow{
-		Time:       e.Time.Format("2006/01/02 15:04"),
+		Time:       time.Now().In(event.TWLoc).Format("2006/01/02 15:04"),
 		Status:     e.Status,
 		Brigade:    raw,
 		CurBrigade: raw,
@@ -77,16 +77,20 @@ func diffBrigadeMarkdown(prev, cur string) (formatted, live string) {
 	return strings.Join(parts, ", "), cur
 }
 
-func RenderRows(heading, activity string, rows []EventRow) string {
+func RenderRows(heading, reportTime, activity string, rows []EventRow) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "## %s\n\n", escapeRich(heading))
+
+	if reportTime != "" {
+		fmt.Fprintf(&b, "報案時間：%s\n\n", reportTime)
+	}
 
 	if activity != "" {
 		fmt.Fprintf(&b, "%s\n\n", activity)
 	}
 
-	b.WriteString("| 時間 | 狀態 | 分隊 |\n")
+	b.WriteString("| 更新時間 | 狀態 | 分隊 |\n")
 	b.WriteString("|:-----|:-----|:-----|\n")
 	for _, r := range rows {
 		fmt.Fprintf(&b, "| %s | %s | %s |\n",

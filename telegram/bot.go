@@ -104,7 +104,7 @@ func googleMapsURL(location string) string {
 	return "https://www.google.com/maps/search/?api=1&query=" + url.QueryEscape(location)
 }
 
-func (b *TGBot) closeEvent(chat int64, uid, location, category, subcategory, brigade string) {
+func (b *TGBot) closeEvent(chat int64, uid, location, category, subcategory, reportTime, brigade string) {
 	msgID, ok := b.getMsgID(uid)
 	if !ok {
 		return
@@ -118,7 +118,7 @@ func (b *TGBot) closeEvent(chat int64, uid, location, category, subcategory, bri
 	finalRow := render.SnapshotRow("已結案", prevBrigade, brigade)
 	rows := append(prevRows, finalRow)
 	h := render.Heading(location, category, subcategory)
-	markdown := render.RenderRows(h, "已結案", rows)
+	markdown := render.RenderRows(h, reportTime, "已結案", rows)
 	mapsURL := googleMapsURL(location)
 
 	if _, err := editRichMessage(b.bot.Token, chat, msgID, markdown, mapsURL); err != nil {
@@ -139,7 +139,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 		event := &result.New[i]
 		h := render.Heading(event.Location, event.Category, event.Subcategory)
 		rows := []render.EventRow{render.InitialRow(event)}
-		markdown := render.RenderRows(h, "🆕 新事件", rows)
+		markdown := render.RenderRows(h, event.Time.Format("2006/01/02 15:04"), "🆕 新事件", rows)
 		mapsURL := googleMapsURL(event.Location)
 
 		msg, err := sendRichMessage(b.bot.Token, chat, markdown, mapsURL, silent)
@@ -178,7 +178,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 		}
 		newRow := render.SnapshotRow(ed.New.Status, prevBrigade, ed.New.Brigade.String())
 		rows := append(prevRows, newRow)
-		markdown := render.RenderRows(h, activity, rows)
+		markdown := render.RenderRows(h, ed.New.Time.Format("2006/01/02 15:04"), activity, rows)
 		mapsURL := googleMapsURL(ed.New.Location)
 
 		msgID, ok := b.getMsgID(ed.New.UID)
@@ -214,7 +214,7 @@ func (b *TGBot) Broadcast(chat int64, result diff.DiffResult, silent bool) error
 
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
-		b.closeEvent(chat, event.UID, event.Location, event.Category, event.Subcategory, event.Brigade.String())
+		b.closeEvent(chat, event.UID, event.Location, event.Category, event.Subcategory, event.Time.Format("2006/01/02 15:04"), event.Brigade.String())
 		log.Println("[close]", event.UID)
 	}
 
@@ -237,20 +237,20 @@ func (b *LocalBot) Broadcast(chat int64, result diff.DiffResult, silent bool) er
 		event := &result.New[i]
 		h := render.Heading(event.Location, event.Category, event.Subcategory)
 		rows := []render.EventRow{render.InitialRow(event)}
-		fmt.Printf("[Chat %d] [new] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "🆕 新事件", rows))
+		fmt.Printf("[Chat %d] [new] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, event.Time.Format("2006/01/02 15:04"), "🆕 新事件", rows))
 	}
 	for i := range result.Updated {
 		ed := &result.Updated[i]
 		h := render.Heading(ed.New.Location, ed.New.Category, ed.New.Subcategory)
 		activity := render.ActivityLine(ed.Changes)
 		row := render.SnapshotRow(ed.New.Status, "", ed.New.Brigade.String())
-		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, ed.New.UID, render.RenderRows(h, activity, []render.EventRow{row}))
+		fmt.Printf("[Chat %d] [update] %s\n%s\n\n", chat, ed.New.UID, render.RenderRows(h, ed.New.Time.Format("2006/01/02 15:04"), activity, []render.EventRow{row}))
 	}
 	for i := range result.Deleted {
 		event := &result.Deleted[i]
 		h := render.Heading(event.Location, event.Category, event.Subcategory)
 		row := render.SnapshotRow("已結案", "", event.Brigade.String())
-		fmt.Printf("[Chat %d] [close] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, "已結案", []render.EventRow{row}))
+		fmt.Printf("[Chat %d] [close] %s\n%s\n\n", chat, event.UID, render.RenderRows(h, event.Time.Format("2006/01/02 15:04"), "已結案", []render.EventRow{row}))
 	}
 	return nil
 }
