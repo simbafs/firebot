@@ -1,20 +1,7 @@
 services:
-  bot:
-    image: ghcr.io/simbafs/tainan-fire:v1.0.0
-    container_name: tainan-fire
+  firebot:
+    build: .
+    container_name: firebot
     restart: always
-    environment:
-      - API_KEY=
-      # Set ALL_CHAT for testing: all cities → single chat, ignores *_CHAT below
-      # - ALL_CHAT=-1001234567890
-      - TAINAN_CHAT=-1002309286627
-      - KAOHSIUNG_CHAT=-1003110857793
-      - HSINCHU_CHAT=-1003421899373
-      # - MIAOLI_CHAT=
-      # - YUNLIN_CHAT=
-      # - TAICHUNG_CHAT=
-      # - CHANGHUA_CHAT=
-      # - TAOYUAN_CHAT=
-      # - NEWTAIPEI_CHAT=
-      # - CHIAYI_CHAT=
-      # - PINGTUNG_CHAT=
+    env-file: 
+      - .env
